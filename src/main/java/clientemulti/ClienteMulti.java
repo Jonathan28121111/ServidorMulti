@@ -1,10 +1,10 @@
 package clientemulti;
- 
+
 import java.io.IOException;
 import java.net.Socket;
- 
+
 public class ClienteMulti {
- 
+
     public static void main(String[] args) {
         Socket s = null;
         try {
@@ -14,7 +14,6 @@ public class ClienteMulti {
             hiloParaMandar.start();
             hiloParaRecibir.start();
             hiloParaMandar.join();
- 
         } catch (Exception e) {
             System.out.println("Error en ClienteMulti: " + e.getMessage());
         } finally {
@@ -24,5 +23,3 @@ public class ClienteMulti {
         }
     }
 }
-
- 
