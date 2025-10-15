@@ -25,6 +25,7 @@ public class ClienteMulti {
             
         } catch (Exception e) {
             System.out.println("Error: " + e.getMessage());
+            e.printStackTrace();
         } finally {
             scanner.close();
             if (s != null && !s.isClosed()) {
