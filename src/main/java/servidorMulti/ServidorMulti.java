@@ -4,18 +4,26 @@ import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.HashMap;
-import java.util.Map;
 
 public class ServidorMulti {
     static HashMap<String, UnCliente> clientes = new HashMap<>();
-    static Map<String, String> usuarios = new HashMap<>(); 
+    static DatabaseManager db;
     
     public static void main(String[] args) {
         int puerto = 8080;
         int contador = 0;
         
+        db = new DatabaseManager();
+       
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            System.out.println("Cerrando servidor...");
+            db.cerrar();
+        }));
+        
         try (ServerSocket servidorSocket = new ServerSocket(puerto)) {
-            System.out.println("Servidor iniciado en el puerto " + puerto);
+            System.out.println("EL SERVER HA INICIADO");
+            System.out.println("Puerto: " + puerto);
+            System.out.println("Base de datos: SQLite");
             
             while (true) {
                 Socket socket = servidorSocket.accept();
@@ -27,23 +35,13 @@ public class ServidorMulti {
                 clientes.put(idCliente, unCliente);
                 hilo.start();
                 
-                System.out.println("Se conectó el cliente #" + contador);
+                System.out.println("Cliente #" + contador + " conectado");
                 contador++;
             }
         } catch (IOException e) {
-            System.out.println("Error en el servidor: " + e.getMessage());
+            System.err.println("Error: " + e.getMessage());
+        } finally {
+            db.cerrar();
         }
-    }
-    
-    public static boolean registrarUsuario(String usuario, String password) {
-        if (usuarios.containsKey(usuario)) {
-            return false;
-        }
-        usuarios.put(usuario, password);
-        return true;
-    }
-    
-    public static boolean autenticarUsuario(String usuario, String password) {
-        return usuarios.containsKey(usuario) && usuarios.get(usuario).equals(password);
     }
 }
