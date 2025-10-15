@@ -17,6 +17,7 @@ public class UnCliente implements Runnable {
     private boolean esperandoMenu = false;
     private String opcionMenu = "";
     private String usuarioTemp = "";
+    private String destinatarioTemp = "";
     
     UnCliente(Socket s, int id) throws IOException {
         this.miId = id;
@@ -31,21 +32,18 @@ public class UnCliente implements Runnable {
             enviarMensaje("=== BIENVENIDO AL CHAT ===");
             enviarMensaje("Cliente #" + miId);
             enviarMensaje("Tienes 3 mensajes gratis");
-            enviarMensaje("");
-            enviarMensaje("Comandos:");
-            enviarMensaje("  @usuario mensaje - Mensaje directo");
-            enviarMensaje("  /bloquear usuario - Bloquear");
-            enviarMensaje("  /desbloquear usuario - Desbloquear");
-            enviarMensaje("  /bloqueados - Ver bloqueados");
-            enviarMensaje("  /usuarios - Ver usuarios");
-            enviarMensaje("  /ayuda - Ayuda");
             enviarMensaje("==========================");
             
             while (!socket.isClosed()) {
                 String mensaje = entrada.readUTF();
                 
                 if (esperandoMenu) {
-                    procesarMenu(mensaje);
+                    procesarMenuAcciones(mensaje);
+                    continue;
+                }
+                
+                if (mensaje.startsWith("MENU:")) {
+                    procesarOpcionMenu(mensaje);
                     continue;
                 }
                 
@@ -53,43 +51,6 @@ public class UnCliente implements Runnable {
                     enviarMensaje("Cerrando conexion...");
                     socket.close();
                     break;
-                }
-                
-                if (mensaje.equalsIgnoreCase("/ayuda")) {
-                    mostrarAyuda();
-                    continue;
-                }
-                
-                if (mensaje.equalsIgnoreCase("/usuarios")) {
-                    listarUsuarios();
-                    continue;
-                }
-                
-                if (mensaje.startsWith("/bloquear ")) {
-                    if (!autenticado) {
-                        enviarMensaje("ERROR: Debes iniciar sesion");
-                        continue;
-                    }
-                    bloquearUsuario(mensaje);
-                    continue;
-                }
-                
-                if (mensaje.startsWith("/desbloquear ")) {
-                    if (!autenticado) {
-                        enviarMensaje("ERROR: Debes iniciar sesion");
-                        continue;
-                    }
-                    desbloquearUsuario(mensaje);
-                    continue;
-                }
-                
-                if (mensaje.equalsIgnoreCase("/bloqueados")) {
-                    if (!autenticado) {
-                        enviarMensaje("ERROR: Debes iniciar sesion");
-                        continue;
-                    }
-                    listarBloqueados();
-                    continue;
                 }
                 
                 if (!autenticado) {
@@ -108,12 +69,6 @@ public class UnCliente implements Runnable {
                     }
                 }
                 
-                if (mensaje.startsWith("@")) {
-                    enviarMensajeDirecto(mensaje);
-                    continue;
-                }
-                
-                // Broadcast
                 String prefijo = autenticado ? "[" + nombreUsuario + "]" : "[Invitado#" + miId + "]";
                 for (UnCliente cliente : ServidorMulti.clientes.values()) {
                     if (cliente.miId != this.miId) {
@@ -138,15 +93,104 @@ public class UnCliente implements Runnable {
         }
     }
     
-    private void bloquearUsuario(String comando) throws IOException {
-        String[] partes = comando.split(" ", 2);
-        if (partes.length < 2) {
-            enviarMensaje("ERROR: Uso /bloquear <usuario>");
-            return;
+    private void procesarOpcionMenu(String mensaje) throws IOException {
+        String opcion = mensaje.substring(5).trim();
+        
+        switch (opcion) {
+            case "2":
+                if (!autenticado) {
+                    enviarMensaje("ERROR: Debes iniciar sesion");
+                    return;
+                }
+                enviarMensaje("PEDIR:Usuario destinatario:");
+                esperandoMenu = true;
+                opcionMenu = "MD_USUARIO";
+                break;
+                
+            case "3":
+                if (!autenticado) {
+                    enviarMensaje("ERROR: Debes iniciar sesion");
+                    return;
+                }
+                enviarMensaje("PEDIR:Usuario a bloquear:");
+                esperandoMenu = true;
+                opcionMenu = "BLOQUEAR";
+                break;
+                
+            case "4":
+                if (!autenticado) {
+                    enviarMensaje("ERROR: Debes iniciar sesion");
+                    return;
+                }
+                enviarMensaje("PEDIR:Usuario a desbloquear:");
+                esperandoMenu = true;
+                opcionMenu = "DESBLOQUEAR";
+                break;
+                
+            case "5":
+                if (!autenticado) {
+                    enviarMensaje("ERROR: Debes iniciar sesion");
+                    return;
+                }
+                listarBloqueados();
+                break;
+                
+            case "6":
+                listarUsuarios();
+                break;
         }
-        
-        String usuarioABloquear = partes[1].trim();
-        
+    }
+    
+    private void procesarMenuAcciones(String mensaje) throws IOException {
+        switch (opcionMenu) {
+            case "MD_USUARIO":
+                destinatarioTemp = mensaje.trim();
+                enviarMensaje("PEDIR:Mensaje:");
+                opcionMenu = "MD_MENSAJE";
+                break;
+                
+            case "MD_MENSAJE":
+                enviarMensajeDirecto(destinatarioTemp, mensaje);
+                esperandoMenu = false;
+                opcionMenu = "";
+                destinatarioTemp = "";
+                break;
+                
+            case "BLOQUEAR":
+                bloquearUsuario(mensaje.trim());
+                esperandoMenu = false;
+                opcionMenu = "";
+                break;
+                
+            case "DESBLOQUEAR":
+                desbloquearUsuario(mensaje.trim());
+                esperandoMenu = false;
+                opcionMenu = "";
+                break;
+                
+            case "ELEGIR":
+                procesarMenuAutenticacion(mensaje);
+                break;
+                
+            case "REGISTRO_USUARIO":
+                procesarRegistroUsuario(mensaje);
+                break;
+                
+            case "REGISTRO_PASSWORD":
+                procesarRegistroPassword(mensaje);
+                break;
+                
+            case "LOGIN_USUARIO":
+                procesarLoginUsuario(mensaje);
+                break;
+                
+            case "LOGIN_PASSWORD":
+                procesarLoginPassword(mensaje);
+                break;
+        }
+    }
+    
+    private void bloquearUsuario(String usuarioABloquear) throws IOException {
         if (usuarioABloquear.equals(nombreUsuario)) {
             enviarMensaje("ERROR: No puedes bloquearte a ti mismo");
             return;
@@ -170,15 +214,7 @@ public class UnCliente implements Runnable {
         }
     }
     
-    private void desbloquearUsuario(String comando) throws IOException {
-        String[] partes = comando.split(" ", 2);
-        if (partes.length < 2) {
-            enviarMensaje("ERROR: Uso /desbloquear <usuario>");
-            return;
-        }
-        
-        String usuarioADesbloquear = partes[1].trim();
-        
+    private void desbloquearUsuario(String usuarioADesbloquear) throws IOException {
         if (!ServidorMulti.db.estaBloqueado(nombreUsuario, usuarioADesbloquear)) {
             enviarMensaje("ERROR: '" + usuarioADesbloquear + "' no esta bloqueado");
             return;
@@ -242,101 +278,87 @@ public class UnCliente implements Runnable {
         opcionMenu = "ELEGIR";
     }
     
-    private void procesarMenu(String mensaje) throws IOException {
-        switch (opcionMenu) {
-            case "ELEGIR":
-                if (mensaje.equals("1")) {
-                    opcionMenu = "REGISTRO_USUARIO";
-                    enviarMensaje("");
-                    enviarMensaje("=== REGISTRO ===");
-                    enviarMensaje("Usuario:");
-                } else if (mensaje.equals("2")) {
-                    opcionMenu = "LOGIN_USUARIO";
-                    enviarMensaje("");
-                    enviarMensaje("=== LOGIN ===");
-                    enviarMensaje("Usuario:");
-                } else {
-                    enviarMensaje("ERROR: Escribe 1 o 2");
-                }
-                break;
-                
-            case "REGISTRO_USUARIO":
-                usuarioTemp = mensaje.trim();
-                if (usuarioTemp.isEmpty()) {
-                    enviarMensaje("ERROR: No puede estar vacio");
-                    enviarMensaje("Usuario:");
-                    break;
-                }
-                if (ServidorMulti.db.existeUsuario(usuarioTemp)) {
-                    enviarMensaje("ERROR: Usuario ya existe");
-                    enviarMensaje("Usuario:");
-                    break;
-                }
-                opcionMenu = "REGISTRO_PASSWORD";
-                enviarMensaje("Contraseña:");
-                break;
-                
-            case "REGISTRO_PASSWORD":
-                String password = mensaje.trim();
-                if (password.isEmpty()) {
-                    enviarMensaje("ERROR: No puede estar vacia");
-                    enviarMensaje("Contraseña:");
-                    break;
-                }
-                
-                if (ServidorMulti.db.registrarUsuario(usuarioTemp, password)) {
-                    autenticado = true;
-                    nombreUsuario = usuarioTemp;
-                    mensajesEnviados = 0;
-                    esperandoMenu = false;
-                    enviarMensaje("");
-                    enviarMensaje("OK: Registro exitoso!");
-                    enviarMensaje("Bienvenido " + nombreUsuario);
-                    enviarMensaje("");
-                    System.out.println("Nuevo usuario: " + nombreUsuario);
-                } else {
-                    enviarMensaje("ERROR: No se pudo registrar");
-                    opcionMenu = "ELEGIR";
-                }
-                usuarioTemp = "";
-                break;
-                
-            case "LOGIN_USUARIO":
-                usuarioTemp = mensaje.trim();
-                opcionMenu = "LOGIN_PASSWORD";
-                enviarMensaje("Contraseña:");
-                break;
-                
-            case "LOGIN_PASSWORD":
-                if (ServidorMulti.db.autenticarUsuario(usuarioTemp, mensaje.trim())) {
-                    autenticado = true;
-                    nombreUsuario = usuarioTemp;
-                    mensajesEnviados = 0;
-                    esperandoMenu = false;
-                    enviarMensaje("");
-                    enviarMensaje("OK: Bienvenido " + nombreUsuario);
-                    enviarMensaje("");
-                    System.out.println(nombreUsuario + " inicio sesion");
-                } else {
-                    enviarMensaje("");
-                    enviarMensaje("ERROR: Credenciales incorrectas");
-                    enviarMensaje("1. Reintentar");
-                    enviarMensaje("2. Registrarse");
-                    opcionMenu = "ELEGIR";
-                }
-                usuarioTemp = "";
-                break;
+    private void procesarMenuAutenticacion(String mensaje) throws IOException {
+        if (mensaje.equals("1")) {
+            opcionMenu = "REGISTRO_USUARIO";
+            enviarMensaje("");
+            enviarMensaje("=== REGISTRO ===");
+            enviarMensaje("Usuario:");
+        } else if (mensaje.equals("2")) {
+            opcionMenu = "LOGIN_USUARIO";
+            enviarMensaje("");
+            enviarMensaje("=== LOGIN ===");
+            enviarMensaje("Usuario:");
+        } else {
+            enviarMensaje("ERROR: Escribe 1 o 2");
         }
     }
     
-    private void mostrarAyuda() throws IOException {
-        enviarMensaje("=== COMANDOS ===");
-        enviarMensaje("@usuario mensaje - Mensaje directo");
-        enviarMensaje("/bloquear usuario - Bloquear");
-        enviarMensaje("/desbloquear usuario - Desbloquear");
-        enviarMensaje("/bloqueados - Ver bloqueados");
-        enviarMensaje("/usuarios - Ver usuarios");
-        enviarMensaje("salir - Cerrar sesion");
+    private void procesarRegistroUsuario(String mensaje) throws IOException {
+        usuarioTemp = mensaje.trim();
+        if (usuarioTemp.isEmpty()) {
+            enviarMensaje("ERROR: No puede estar vacio");
+            enviarMensaje("Usuario:");
+            return;
+        }
+        if (ServidorMulti.db.existeUsuario(usuarioTemp)) {
+            enviarMensaje("ERROR: Usuario ya existe");
+            enviarMensaje("Usuario:");
+            return;
+        }
+        opcionMenu = "REGISTRO_PASSWORD";
+        enviarMensaje("Contraseña:");
+    }
+    
+    private void procesarRegistroPassword(String mensaje) throws IOException {
+        String password = mensaje.trim();
+        if (password.isEmpty()) {
+            enviarMensaje("ERROR: No puede estar vacia");
+            enviarMensaje("Contraseña:");
+            return;
+        }
+        
+        if (ServidorMulti.db.registrarUsuario(usuarioTemp, password)) {
+            autenticado = true;
+            nombreUsuario = usuarioTemp;
+            mensajesEnviados = 0;
+            esperandoMenu = false;
+            enviarMensaje("");
+            enviarMensaje("OK: Registro exitoso!");
+            enviarMensaje("Bienvenido " + nombreUsuario);
+            enviarMensaje("");
+            System.out.println("Nuevo usuario: " + nombreUsuario);
+        } else {
+            enviarMensaje("ERROR: No se pudo registrar");
+            opcionMenu = "ELEGIR";
+        }
+        usuarioTemp = "";
+    }
+    
+    private void procesarLoginUsuario(String mensaje) throws IOException {
+        usuarioTemp = mensaje.trim();
+        opcionMenu = "LOGIN_PASSWORD";
+        enviarMensaje("Contraseña:");
+    }
+    
+    private void procesarLoginPassword(String mensaje) throws IOException {
+        if (ServidorMulti.db.autenticarUsuario(usuarioTemp, mensaje.trim())) {
+            autenticado = true;
+            nombreUsuario = usuarioTemp;
+            mensajesEnviados = 0;
+            esperandoMenu = false;
+            enviarMensaje("");
+            enviarMensaje("OK: Bienvenido " + nombreUsuario);
+            enviarMensaje("");
+            System.out.println(nombreUsuario + " inicio sesion");
+        } else {
+            enviarMensaje("");
+            enviarMensaje("ERROR: Credenciales incorrectas");
+            enviarMensaje("1. Reintentar");
+            enviarMensaje("2. Registrarse");
+            opcionMenu = "ELEGIR";
+        }
+        usuarioTemp = "";
     }
     
     private void enviarMensaje(String msg) throws IOException {
@@ -344,16 +366,7 @@ public class UnCliente implements Runnable {
         salida.flush();
     }
     
-    private void enviarMensajeDirecto(String mensaje) throws IOException {
-        String[] partes = mensaje.split(" ", 2);
-        if (partes.length < 2) {
-            enviarMensaje("ERROR: Formato @usuario mensaje");
-            return;
-        }
-        
-        String destinatario = partes[0].substring(1);
-        String textoMensaje = partes[1];
-        
+    private void enviarMensajeDirecto(String destinatario, String textoMensaje) throws IOException {
         UnCliente clienteDestino = null;
         for (UnCliente cliente : ServidorMulti.clientes.values()) {
             if (cliente.autenticado && cliente.nombreUsuario.equals(destinatario)) {
