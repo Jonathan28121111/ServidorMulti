@@ -42,12 +42,61 @@ public class UnCliente implements Runnable {
                     continue;
                 }
                 
-                if (mensaje.startsWith("MENU:")) {
-                    procesarOpcionMenu(mensaje);
+                if (mensaje.equals("1")) {
+                    enviarMensaje("Escribe tu mensaje:");
+                    esperandoMenu = true;
+                    opcionMenu = "ENVIAR_MENSAJE";
                     continue;
                 }
                 
-                if (mensaje.equalsIgnoreCase("salir")) {
+                if (mensaje.equals("2")) {
+                    if (!autenticado) {
+                        enviarMensaje("ERROR: Debes iniciar sesion");
+                        continue;
+                    }
+                    enviarMensaje("Usuario destinatario:");
+                    esperandoMenu = true;
+                    opcionMenu = "MD_USUARIO";
+                    continue;
+                }
+                
+                if (mensaje.equals("3")) {
+                    if (!autenticado) {
+                        enviarMensaje("ERROR: Debes iniciar sesion");
+                        continue;
+                    }
+                    enviarMensaje("Usuario a bloquear:");
+                    esperandoMenu = true;
+                    opcionMenu = "BLOQUEAR";
+                    continue;
+                }
+                
+                if (mensaje.equals("4")) {
+                    if (!autenticado) {
+                        enviarMensaje("ERROR: Debes iniciar sesion");
+                        continue;
+                    }
+                    enviarMensaje("Usuario a desbloquear:");
+                    esperandoMenu = true;
+                    opcionMenu = "DESBLOQUEAR";
+                    continue;
+                }
+                
+                if (mensaje.equals("5")) {
+                    if (!autenticado) {
+                        enviarMensaje("ERROR: Debes iniciar sesion");
+                        continue;
+                    }
+                    listarBloqueados();
+                    continue;
+                }
+                
+                if (mensaje.equals("6")) {
+                    listarUsuarios();
+                    continue;
+                }
+                
+                if (mensaje.equalsIgnoreCase("salir") || mensaje.equals("7")) {
                     enviarMensaje("Cerrando conexion...");
                     socket.close();
                     break;
@@ -93,59 +142,27 @@ public class UnCliente implements Runnable {
         }
     }
     
-    private void procesarOpcionMenu(String mensaje) throws IOException {
-        String opcion = mensaje.substring(5).trim();
-        
-        switch (opcion) {
-            case "2":
-                if (!autenticado) {
-                    enviarMensaje("ERROR: Debes iniciar sesion");
-                    return;
-                }
-                enviarMensaje("PEDIR:Usuario destinatario:");
-                esperandoMenu = true;
-                opcionMenu = "MD_USUARIO";
-                break;
-                
-            case "3":
-                if (!autenticado) {
-                    enviarMensaje("ERROR: Debes iniciar sesion");
-                    return;
-                }
-                enviarMensaje("PEDIR:Usuario a bloquear:");
-                esperandoMenu = true;
-                opcionMenu = "BLOQUEAR";
-                break;
-                
-            case "4":
-                if (!autenticado) {
-                    enviarMensaje("ERROR: Debes iniciar sesion");
-                    return;
-                }
-                enviarMensaje("PEDIR:Usuario a desbloquear:");
-                esperandoMenu = true;
-                opcionMenu = "DESBLOQUEAR";
-                break;
-                
-            case "5":
-                if (!autenticado) {
-                    enviarMensaje("ERROR: Debes iniciar sesion");
-                    return;
-                }
-                listarBloqueados();
-                break;
-                
-            case "6":
-                listarUsuarios();
-                break;
-        }
-    }
-    
     private void procesarMenuAcciones(String mensaje) throws IOException {
         switch (opcionMenu) {
+            case "ENVIAR_MENSAJE":
+                String prefijo = autenticado ? "[" + nombreUsuario + "]" : "[Invitado#" + miId + "]";
+                for (UnCliente cliente : ServidorMulti.clientes.values()) {
+                    if (cliente.miId != this.miId) {
+                        if (cliente.autenticado && autenticado) {
+                            if (ServidorMulti.db.estaBloqueado(cliente.nombreUsuario, nombreUsuario)) {
+                                continue;
+                            }
+                        }
+                        cliente.enviarMensaje(prefijo + ": " + mensaje);
+                    }
+                }
+                esperandoMenu = false;
+                opcionMenu = "";
+                break;
+                
             case "MD_USUARIO":
                 destinatarioTemp = mensaje.trim();
-                enviarMensaje("PEDIR:Mensaje:");
+                enviarMensaje("Mensaje:");
                 opcionMenu = "MD_MENSAJE";
                 break;
                 
