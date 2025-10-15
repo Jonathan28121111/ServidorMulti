@@ -4,6 +4,7 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.Socket;
+import java.util.List;
 
 public class UnCliente implements Runnable {
     final DataOutputStream salida;
@@ -27,15 +28,21 @@ public class UnCliente implements Runnable {
     @Override
     public void run() {
         try {
-            enviarMensaje("BIENVENIDO");
-            enviarMensaje("Eres el cliente #" + miId);
-            enviarMensaje("Tienes 3 mensajes gratis. Despues debes autenticarte.");
-            enviarMensaje("Comandos: @<id> <mensaje> para mensajes directos");
+            enviarMensaje("=== BIENVENIDO AL CHAT ===");
+            enviarMensaje("Cliente #" + miId);
+            enviarMensaje("Tienes 3 mensajes gratis");
+            enviarMensaje("");
+            enviarMensaje("Comandos:");
+            enviarMensaje("  @usuario mensaje - Mensaje directo");
+            enviarMensaje("  /bloquear usuario - Bloquear");
+            enviarMensaje("  /desbloquear usuario - Desbloquear");
+            enviarMensaje("  /bloqueados - Ver bloqueados");
+            enviarMensaje("  /usuarios - Ver usuarios");
+            enviarMensaje("  /ayuda - Ayuda");
             enviarMensaje("==========================");
             
             while (!socket.isClosed()) {
                 String mensaje = entrada.readUTF();
-                System.out.println("Cliente #" + miId + " envio: " + mensaje);
                 
                 if (esperandoMenu) {
                     procesarMenu(mensaje);
@@ -43,9 +50,46 @@ public class UnCliente implements Runnable {
                 }
                 
                 if (mensaje.equalsIgnoreCase("salir")) {
-                    enviarMensaje("[SISTEMA] Cerrando conexion...");
+                    enviarMensaje("Cerrando conexion...");
                     socket.close();
                     break;
+                }
+                
+                if (mensaje.equalsIgnoreCase("/ayuda")) {
+                    mostrarAyuda();
+                    continue;
+                }
+                
+                if (mensaje.equalsIgnoreCase("/usuarios")) {
+                    listarUsuarios();
+                    continue;
+                }
+                
+                if (mensaje.startsWith("/bloquear ")) {
+                    if (!autenticado) {
+                        enviarMensaje("ERROR: Debes iniciar sesion");
+                        continue;
+                    }
+                    bloquearUsuario(mensaje);
+                    continue;
+                }
+                
+                if (mensaje.startsWith("/desbloquear ")) {
+                    if (!autenticado) {
+                        enviarMensaje("ERROR: Debes iniciar sesion");
+                        continue;
+                    }
+                    desbloquearUsuario(mensaje);
+                    continue;
+                }
+                
+                if (mensaje.equalsIgnoreCase("/bloqueados")) {
+                    if (!autenticado) {
+                        enviarMensaje("ERROR: Debes iniciar sesion");
+                        continue;
+                    }
+                    listarBloqueados();
+                    continue;
                 }
                 
                 if (!autenticado) {
@@ -57,12 +101,10 @@ public class UnCliente implements Runnable {
                     mensajesEnviados++;
                     int restantes = 3 - mensajesEnviados;
                     
-                    System.out.println("Cliente #" + miId + " ha enviado " + mensajesEnviados + "/3 mensajes");
-                    
                     if (restantes > 0) {
-                        enviarMensaje("[AVISO] Te quedan " + restantes + " mensajes gratis");
+                        enviarMensaje("INFO: Te quedan " + restantes + " mensajes");
                     } else {
-                        enviarMensaje("[AVISO] Este fue tu ultimo mensaje gratis.");
+                        enviarMensaje("INFO: Ultimo mensaje gratis");
                     }
                 }
                 
@@ -70,16 +112,22 @@ public class UnCliente implements Runnable {
                     enviarMensajeDirecto(mensaje);
                     continue;
                 }
-              
-                String prefijo = autenticado ? "[" + nombreUsuario + "]" : "[Invitado #" + miId + "]";
+                
+                // Broadcast
+                String prefijo = autenticado ? "[" + nombreUsuario + "]" : "[Invitado#" + miId + "]";
                 for (UnCliente cliente : ServidorMulti.clientes.values()) {
                     if (cliente.miId != this.miId) {
+                        if (cliente.autenticado && autenticado) {
+                            if (ServidorMulti.db.estaBloqueado(cliente.nombreUsuario, nombreUsuario)) {
+                                continue;
+                            }
+                        }
                         cliente.enviarMensaje(prefijo + ": " + mensaje);
                     }
                 }
             }
         } catch (IOException ex) {
-            System.out.println("Cliente #" + miId + " desconectado: " + ex.getMessage());
+            System.out.println("Cliente #" + miId + " desconectado");
         } finally {
             ServidorMulti.clientes.remove(Integer.toString(miId));
             try {
@@ -90,14 +138,106 @@ public class UnCliente implements Runnable {
         }
     }
     
+    private void bloquearUsuario(String comando) throws IOException {
+        String[] partes = comando.split(" ", 2);
+        if (partes.length < 2) {
+            enviarMensaje("ERROR: Uso /bloquear <usuario>");
+            return;
+        }
+        
+        String usuarioABloquear = partes[1].trim();
+        
+        if (usuarioABloquear.equals(nombreUsuario)) {
+            enviarMensaje("ERROR: No puedes bloquearte a ti mismo");
+            return;
+        }
+        
+        if (!ServidorMulti.db.existeUsuario(usuarioABloquear)) {
+            enviarMensaje("ERROR: Usuario '" + usuarioABloquear + "' no existe");
+            return;
+        }
+        
+        if (ServidorMulti.db.estaBloqueado(nombreUsuario, usuarioABloquear)) {
+            enviarMensaje("ERROR: Ya bloqueaste a '" + usuarioABloquear + "'");
+            return;
+        }
+        
+        if (ServidorMulti.db.bloquearUsuario(nombreUsuario, usuarioABloquear)) {
+            enviarMensaje("OK: Bloqueaste a '" + usuarioABloquear + "'");
+            System.out.println(nombreUsuario + " bloqueo a " + usuarioABloquear);
+        } else {
+            enviarMensaje("ERROR: No se pudo bloquear");
+        }
+    }
+    
+    private void desbloquearUsuario(String comando) throws IOException {
+        String[] partes = comando.split(" ", 2);
+        if (partes.length < 2) {
+            enviarMensaje("ERROR: Uso /desbloquear <usuario>");
+            return;
+        }
+        
+        String usuarioADesbloquear = partes[1].trim();
+        
+        if (!ServidorMulti.db.estaBloqueado(nombreUsuario, usuarioADesbloquear)) {
+            enviarMensaje("ERROR: '" + usuarioADesbloquear + "' no esta bloqueado");
+            return;
+        }
+        
+        if (ServidorMulti.db.desbloquearUsuario(nombreUsuario, usuarioADesbloquear)) {
+            enviarMensaje("OK: Desbloqueaste a '" + usuarioADesbloquear + "'");
+            System.out.println(nombreUsuario + " desbloqueo a " + usuarioADesbloquear);
+        } else {
+            enviarMensaje("ERROR: No se pudo desbloquear");
+        }
+    }
+    
+    private void listarBloqueados() throws IOException {
+        List<String> bloqueados = ServidorMulti.db.listarBloqueados(nombreUsuario);
+        
+        if (bloqueados.isEmpty()) {
+            enviarMensaje("No tienes usuarios bloqueados");
+            return;
+        }
+        
+        enviarMensaje("=== USUARIOS BLOQUEADOS ===");
+        for (String bloqueado : bloqueados) {
+            enviarMensaje("  - " + bloqueado);
+        }
+        enviarMensaje("Total: " + bloqueados.size());
+    }
+    
+    private void listarUsuarios() throws IOException {
+        List<String> usuarios = ServidorMulti.db.listarUsuarios();
+        
+        if (usuarios.isEmpty()) {
+            enviarMensaje("No hay usuarios registrados");
+            return;
+        }
+        
+        enviarMensaje("=== USUARIOS REGISTRADOS ===");
+        for (String usuario : usuarios) {
+            String estado = "";
+            if (autenticado && ServidorMulti.db.estaBloqueado(nombreUsuario, usuario)) {
+                estado = " [BLOQUEADO]";
+            }
+            if (autenticado && usuario.equals(nombreUsuario)) {
+                estado = " [TU]";
+            }
+            enviarMensaje("  - " + usuario + estado);
+        }
+        enviarMensaje("Total: " + usuarios.size());
+    }
+    
     private void mostrarMenuAutenticacion() throws IOException {
         enviarMensaje("");
-        enviarMensaje("Ya no puedes enviar mensajes has alcanzado el limite");
-        enviarMensaje("Autenticate para enviar mensaje sin limites");
-        enviarMensaje("Selecciona una opcion:");
+        enviarMensaje("*** LIMITE ALCANZADO ***");
+        enviarMensaje("Debes autenticarte para continuar");
+        enviarMensaje("");
         enviarMensaje("1. Registrarse");
-        enviarMensaje("2.Iniciar sesion");
-        enviarMensaje("Escribe 1 o 2:");
+        enviarMensaje("2. Iniciar sesion");
+        enviarMensaje("");
+        enviarMensaje("Elige (1 o 2):");
         esperandoMenu = true;
         opcionMenu = "ELEGIR";
     }
@@ -108,76 +248,95 @@ public class UnCliente implements Runnable {
                 if (mensaje.equals("1")) {
                     opcionMenu = "REGISTRO_USUARIO";
                     enviarMensaje("");
-                    enviarMensaje("=== REGISTRO DE NUEVA CUENTA ===");
-                    enviarMensaje("Ingresa tu nombre de usuario:");
+                    enviarMensaje("=== REGISTRO ===");
+                    enviarMensaje("Usuario:");
                 } else if (mensaje.equals("2")) {
                     opcionMenu = "LOGIN_USUARIO";
                     enviarMensaje("");
-                    enviarMensaje("=== INICIAR SESION ===");
-                    enviarMensaje("Ingresa tu nombre de usuario:");
+                    enviarMensaje("=== LOGIN ===");
+                    enviarMensaje("Usuario:");
                 } else {
-                    enviarMensaje("[ERROR] Opcion invalida. Escribe 1 o 2:");
+                    enviarMensaje("ERROR: Escribe 1 o 2");
                 }
                 break;
                 
             case "REGISTRO_USUARIO":
-                usuarioTemp = mensaje;
+                usuarioTemp = mensaje.trim();
+                if (usuarioTemp.isEmpty()) {
+                    enviarMensaje("ERROR: No puede estar vacio");
+                    enviarMensaje("Usuario:");
+                    break;
+                }
+                if (ServidorMulti.db.existeUsuario(usuarioTemp)) {
+                    enviarMensaje("ERROR: Usuario ya existe");
+                    enviarMensaje("Usuario:");
+                    break;
+                }
                 opcionMenu = "REGISTRO_PASSWORD";
-                enviarMensaje("Ingresa tu contrasena:");
+                enviarMensaje("Contraseña:");
                 break;
                 
             case "REGISTRO_PASSWORD":
-                if (ServidorMulti.registrarUsuario(usuarioTemp, mensaje)) {
+                String password = mensaje.trim();
+                if (password.isEmpty()) {
+                    enviarMensaje("ERROR: No puede estar vacia");
+                    enviarMensaje("Contraseña:");
+                    break;
+                }
+                
+                if (ServidorMulti.db.registrarUsuario(usuarioTemp, password)) {
                     autenticado = true;
                     nombreUsuario = usuarioTemp;
                     mensajesEnviados = 0;
                     esperandoMenu = false;
                     enviarMensaje("");
-                    enviarMensaje("BIENVENIDO TE HAS REGISTRADO");
-                    enviarMensaje("Bienvenido " + nombreUsuario + "!" + " ".repeat(Math.max(0, 24 - nombreUsuario.length())));
-                    enviarMensaje("Empieza a mandar mensaje a tus amigos");
+                    enviarMensaje("OK: Registro exitoso!");
+                    enviarMensaje("Bienvenido " + nombreUsuario);
                     enviarMensaje("");
-                    System.out.println("Cliente #" + miId + " registrado como: " + nombreUsuario);
+                    System.out.println("Nuevo usuario: " + nombreUsuario);
                 } else {
-                    enviarMensaje("");
-                    enviarMensaje("[ERROR] El usuario '" + usuarioTemp + "' ya existe.");
-                    enviarMensaje("Por favor elige otra opcion:");
-                    enviarMensaje("1. Intentar con otro nombre de usuario");
-                    enviarMensaje("2. Iniciar sesion con este usuario");
+                    enviarMensaje("ERROR: No se pudo registrar");
                     opcionMenu = "ELEGIR";
                 }
                 usuarioTemp = "";
                 break;
                 
             case "LOGIN_USUARIO":
-                usuarioTemp = mensaje;
+                usuarioTemp = mensaje.trim();
                 opcionMenu = "LOGIN_PASSWORD";
-                enviarMensaje("Ingresa tu contrasena:");
+                enviarMensaje("Contraseña:");
                 break;
                 
             case "LOGIN_PASSWORD":
-                if (ServidorMulti.autenticarUsuario(usuarioTemp, mensaje)) {
+                if (ServidorMulti.db.autenticarUsuario(usuarioTemp, mensaje.trim())) {
                     autenticado = true;
                     nombreUsuario = usuarioTemp;
                     mensajesEnviados = 0;
                     esperandoMenu = false;
                     enviarMensaje("");
-                    enviarMensaje("BIENVENIDO DE VUELTA");
-                    enviarMensaje("║  Bienvenido de nuevo " + nombreUsuario + "!" + " ".repeat(Math.max(0, 16 - nombreUsuario.length())) + "║");
-                    enviarMensaje("Empieza a mandar mensaje a tus amigos");
+                    enviarMensaje("OK: Bienvenido " + nombreUsuario);
                     enviarMensaje("");
-                    System.out.println("Cliente #" + miId + " inicio sesion como: " + nombreUsuario);
+                    System.out.println(nombreUsuario + " inicio sesion");
                 } else {
                     enviarMensaje("");
-                    enviarMensaje("[ERROR] Usuario o contrasena incorrectos.");
-                    enviarMensaje("¿Que deseas hacer?");
-                    enviarMensaje("1. Intentar de nuevo");
-                    enviarMensaje("2. Registrarse como usuario nuevo");
+                    enviarMensaje("ERROR: Credenciales incorrectas");
+                    enviarMensaje("1. Reintentar");
+                    enviarMensaje("2. Registrarse");
                     opcionMenu = "ELEGIR";
                 }
                 usuarioTemp = "";
                 break;
         }
+    }
+    
+    private void mostrarAyuda() throws IOException {
+        enviarMensaje("=== COMANDOS ===");
+        enviarMensaje("@usuario mensaje - Mensaje directo");
+        enviarMensaje("/bloquear usuario - Bloquear");
+        enviarMensaje("/desbloquear usuario - Desbloquear");
+        enviarMensaje("/bloqueados - Ver bloqueados");
+        enviarMensaje("/usuarios - Ver usuarios");
+        enviarMensaje("salir - Cerrar sesion");
     }
     
     private void enviarMensaje(String msg) throws IOException {
@@ -188,21 +347,35 @@ public class UnCliente implements Runnable {
     private void enviarMensajeDirecto(String mensaje) throws IOException {
         String[] partes = mensaje.split(" ", 2);
         if (partes.length < 2) {
-            enviarMensaje("[ERROR] Formato: @<id> <mensaje>");
+            enviarMensaje("ERROR: Formato @usuario mensaje");
             return;
         }
         
-        String aQuien = partes[0].substring(1);
+        String destinatario = partes[0].substring(1);
         String textoMensaje = partes[1];
         
-        UnCliente cliente = ServidorMulti.clientes.get(aQuien);
-        
-        if (cliente != null) {
-            String prefijo = autenticado ? "[MD de " + nombreUsuario + "]" : "[MD de Invitado #" + miId + "]";
-            cliente.enviarMensaje(prefijo + ": " + textoMensaje);
-            enviarMensaje("[ENVIADO] Mensaje directo a #" + aQuien);
-        } else {
-            enviarMensaje("[ERROR] Cliente #" + aQuien + " no existe");
+        UnCliente clienteDestino = null;
+        for (UnCliente cliente : ServidorMulti.clientes.values()) {
+            if (cliente.autenticado && cliente.nombreUsuario.equals(destinatario)) {
+                clienteDestino = cliente;
+                break;
+            }
         }
+        
+        if (clienteDestino == null) {
+            enviarMensaje("ERROR: Usuario '" + destinatario + "' no conectado");
+            return;
+        }
+        
+        if (autenticado && clienteDestino.autenticado) {
+            if (ServidorMulti.db.estaBloqueado(clienteDestino.nombreUsuario, nombreUsuario)) {
+                enviarMensaje("ERROR: No puedes enviar mensajes a '" + destinatario + "'");
+                return;
+            }
+        }
+        
+        String prefijo = autenticado ? "[MD de " + nombreUsuario + "]" : "[MD de Invitado#" + miId + "]";
+        clienteDestino.enviarMensaje(prefijo + ": " + textoMensaje);
+        enviarMensaje("ENVIADO -> " + destinatario);
     }
 }
