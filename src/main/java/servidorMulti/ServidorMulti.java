@@ -8,12 +8,14 @@ import java.util.HashMap;
 public class ServidorMulti {
     static HashMap<String, UnCliente> clientes = new HashMap<>();
     static DatabaseManager db;
+      static GestorJuegos gestorJuegos;
     
     public static void main(String[] args) {
         int puerto = 8080;
         int contador = 0;
         
         db = new DatabaseManager();
+        gestorJuegos = new GestorJuegos(); 
        
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             System.out.println("Cerrando servidor...");
