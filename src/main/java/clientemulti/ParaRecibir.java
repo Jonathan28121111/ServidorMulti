@@ -26,11 +26,17 @@ public class ParaRecibir implements Runnable {
                     Thread.sleep(500);
                     mostrarMenu();
                 }
-                
+       
                 if (autenticado && (mensaje.contains("OK:") || mensaje.contains("ERROR:") || 
                     mensaje.contains("Total:") || mensaje.contains("ENVIADO") || 
                     mensaje.contains("Escribe tu mensaje"))) {
                     Thread.sleep(300);
+                    mostrarMenu();
+                }
+                
+                if (mensaje.contains("GANASTE") || mensaje.contains("PERDISTE") || 
+                    mensaje.contains("EMPATE") || mensaje.contains("gana por abandono")) {
+                    Thread.sleep(500);
                     mostrarMenu();
                 }
             }
@@ -42,14 +48,22 @@ public class ParaRecibir implements Runnable {
     }
     
     private void mostrarMenu() {
-        System.out.println("\n=== MENU ===");
-        System.out.println("1. Enviar mensaje");
-        System.out.println("2. Mensaje directo");
-        System.out.println("3. Bloquear usuario");
-        System.out.println("4. Desbloquear usuario");
-        System.out.println("5. Ver bloqueados");
-        System.out.println("6. Ver usuarios");
-        System.out.println("7. Salir");
+        System.out.println("""
+            
+            === MENU ===
+            1. Enviar mensaje
+            2. Mensaje directo
+            3. Bloquear usuario
+            4. Desbloquear usuario
+            5. Ver bloqueados
+            6. Ver usuarios
+            7. Salir
+            ------------------------------------
+            JUEGO DEL GATO:
+            8. Invitar a jugar
+            9. Ver estado del juego
+            ====================================
+            """);
         System.out.print("Opcion: ");
     }
 }
