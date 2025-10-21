@@ -10,7 +10,7 @@ public class JuegoGato {
     private boolean juegoActivo;
     private final char SIMBOLO_J1 = 'X';
     private final char SIMBOLO_J2 = 'O';
-    private final char VACIO = '-';
+    private final char VACIO = ' ';
     
     public JuegoGato(String jugador1, String jugador2) {
         this.jugador1 = jugador1;
@@ -111,21 +111,18 @@ public class JuegoGato {
             }
         }
         
-        // Verificar diagonal principal
         if (tablero[0][0] != VACIO && 
             tablero[0][0] == tablero[1][1] && 
             tablero[1][1] == tablero[2][2]) {
             return new ResultadoJuego(true, getGanadorPorSimbolo(tablero[0][0]), false);
         }
         
-        // Verificar diagonal secundaria
         if (tablero[0][2] != VACIO && 
             tablero[0][2] == tablero[1][1] && 
             tablero[1][1] == tablero[2][0]) {
             return new ResultadoJuego(true, getGanadorPorSimbolo(tablero[0][2]), false);
         }
         
-        // Verificar empate
         boolean tableroLleno = true;
         for (int i = 0; i < 3; i++) {
             for (int j = 0; j < 3; j++) {
@@ -149,21 +146,19 @@ public class JuegoGato {
     
     public String obtenerTableroTexto() {
         StringBuilder sb = new StringBuilder();
-        sb.append("\n┌───┬───┬───┐\n");
+        sb.append("\n  Tablero:\n\n");
+        sb.append("     0   1   2\n");
+        sb.append("   +---+---+---+\n");
+        
         for (int i = 0; i < 3; i++) {
-            sb.append("│");
+            sb.append(" ").append(i).append(" |");
             for (int j = 0; j < 3; j++) {
-                char celda = tablero[i][j];
-                sb.append(" ").append(celda == VACIO ? " " : celda).append(" ");
-                sb.append(j < 2 ? "│" : "");
+                sb.append(" ").append(tablero[i][j]).append(" |");
             }
-            sb.append("│\n");
-            if (i < 2) {
-                sb.append("├───┼───┼───┤\n");
-            }
+            sb.append("\n");
+            sb.append("   +---+---+---+\n");
         }
-        sb.append("└───┴───┴───┘\n");
-        sb.append("  0   1   2\n");
+        
         return sb.toString();
     }
     
