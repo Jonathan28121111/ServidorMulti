@@ -21,23 +21,30 @@ public class ParaRecibir implements Runnable {
                 String mensaje = entrada.readUTF();
                 System.out.println(mensaje);
                 
-                if (mensaje.contains("OK: Registro exitoso") || mensaje.contains("OK: Bienvenido")) {
+                if (mensaje.contains("OK: Registro exitoso") || mensaje.contains("OK: Bienvenido") ||
+                    mensaje.contains("REGISTRO EXITOSO") || mensaje.contains("INICIO DE SESION EXITOSO")) {
                     autenticado = true;
                     Thread.sleep(500);
                     mostrarMenu();
                 }
        
-                if (autenticado && (mensaje.contains("OK:") || mensaje.contains("ERROR:") || 
-                    mensaje.contains("Total:") || mensaje.contains("ENVIADO") || 
-                    mensaje.contains("Escribe tu mensaje"))) {
+                if (autenticado && !mensaje.contains("ERROR: Debes iniciar sesion") && 
+                    (mensaje.contains("OK:") || mensaje.contains("Total:") || 
+                    mensaje.contains("ENVIADO") || mensaje.contains("Escribe tu mensaje"))) {
                     Thread.sleep(300);
                     mostrarMenu();
+                }
+                
+                if (!autenticado && mensaje.contains("ERROR: Debes iniciar sesion")) {
+                    continue;
                 }
                 
                 if (mensaje.contains("GANASTE") || mensaje.contains("PERDISTE") || 
                     mensaje.contains("EMPATE") || mensaje.contains("gana por abandono")) {
                     Thread.sleep(500);
-                    mostrarMenu();
+                    if (autenticado) {
+                        mostrarMenu();
+                    }
                 }
             }
         } catch (IOException | InterruptedException e) {
