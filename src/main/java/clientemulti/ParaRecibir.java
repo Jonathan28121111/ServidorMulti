@@ -29,8 +29,9 @@ public class ParaRecibir implements Runnable {
                 }
        
                 if (autenticado && !mensaje.contains("ERROR: Debes iniciar sesion") && 
+                    !mensaje.contains("Escribe tu mensaje") &&
                     (mensaje.contains("OK:") || mensaje.contains("Total:") || 
-                    mensaje.contains("ENVIADO") || mensaje.contains("Escribe tu mensaje"))) {
+                    mensaje.contains("ENVIADO"))) {
                     Thread.sleep(300);
                     mostrarMenu();
                 }
