@@ -270,6 +270,10 @@ public class UnCliente implements Runnable {
             case "LOGIN_PASSWORD":
                 procesarLoginPassword(mensaje);
                 break;
+                
+            case "LOGIN_REINTENTAR":
+                procesarMenuLoginError(mensaje);
+                break;
         }
     }
     
@@ -684,6 +688,19 @@ public class UnCliente implements Runnable {
         }
     }
     
+    private void procesarMenuLoginError(String mensaje) throws IOException {
+        if (mensaje.equals("1")) {
+            opcionMenu = "LOGIN_USUARIO";
+            enviarMensaje("\n=== LOGIN ===\nUsuario: ");
+        } else if (mensaje.equals("2")) {
+            // Ir a registro
+            opcionMenu = "REGISTRO_USUARIO";
+            enviarMensaje("\n=== REGISTRO ===\nUsuario: ");
+        } else {
+            enviarMensaje("ERROR: Escribe 1 o 2\n\n1. Reintentar\n2. Registrarse\n\nOpcion: ");
+        }
+    }
+    
     private void procesarRegistroUsuario(String mensaje) throws IOException {
         usuarioTemp = mensaje.trim();
         if (usuarioTemp.isEmpty()) {
@@ -737,7 +754,7 @@ public class UnCliente implements Runnable {
             System.out.println(nombreUsuario + " inicio sesion");
         } else {
             enviarMensaje("\nERROR: Usuario o contraseña incorrectos\n\n1. Reintentar\n2. Registrarse\n\nOpcion: ");
-            opcionMenu = "ELEGIR";
+            opcionMenu = "LOGIN_REINTENTAR";
         }
         usuarioTemp = "";
     }
