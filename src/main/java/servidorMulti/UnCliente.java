@@ -29,23 +29,17 @@ public class UnCliente implements Runnable {
     @Override
     public void run() {
         try {
-            enviarMensaje("""
-                === BIENVENIDO AL CHAT + GATO ===
-                Cliente #%d
-                Tienes 3 mensajes gratis
-                ==================================
-                """.formatted(miId));
+            enviarMensaje("\n=== BIENVENIDO AL CHAT + GATO ===\n");
+            mostrarMenuAutenticacion();
             
             while (!socket.isClosed()) {
                 String mensaje = entrada.readUTF();
                 
-                // Verificar invitacion pendiente
                 if (autenticado && !esperandoMenu) {
                     if (ServidorMulti.gestorJuegos.tieneInvitacionPendiente(nombreUsuario)) {
                         String invitador = ServidorMulti.gestorJuegos.obtenerInvitador(nombreUsuario);
                         if (invitador != null) {
-                            enviarMensaje("\n" + invitador + " te invita a jugar GATO!");
-                            enviarMensaje("Responde: ACEPTAR o RECHAZAR");
+                            enviarMensaje("\n" + invitador + " te invita a jugar GATO\nAceptar o Rechazar: ");
                             esperandoMenu = true;
                             opcionMenu = "RESPONDER_INVITACION";
                             continue;
@@ -108,6 +102,10 @@ public class UnCliente implements Runnable {
                 }
                 
                 if (mensaje.equals("6")) {
+                    if (!autenticado) {
+                        enviarMensaje("ERROR: Debes iniciar sesion");
+                        continue;
+                    }
                     listarUsuarios();
                     continue;
                 }
@@ -140,6 +138,7 @@ public class UnCliente implements Runnable {
                 
                 if (!autenticado) {
                     if (mensajesEnviados >= 3) {
+                        enviarMensaje("\nLIMITE ALCANZADO: Debes autenticarte para continuar\n");
                         mostrarMenuAutenticacion();
                         continue;
                     }
@@ -196,12 +195,7 @@ public class UnCliente implements Runnable {
         for (UnCliente cliente : ServidorMulti.clientes.values()) {
             if (cliente.autenticado && cliente.nombreUsuario.equals(ganador)) {
                 try {
-                    cliente.enviarMensaje("""
-                        
-                        *** GANASTE ***
-                        %s se desconecto
-                        Ganas por abandono
-                        """.formatted(perdedor));
+                    cliente.enviarMensaje("\n*** GANASTE ***\n" + perdedor + " se desconecto\n");
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
@@ -282,11 +276,7 @@ public class UnCliente implements Runnable {
     private void procesarEnvioMensaje(String mensaje) throws IOException {
         JuegoGato juego = ServidorMulti.gestorJuegos.obtenerJuego(nombreUsuario);
         if (juego != null && juego.isJuegoActivo()) {
-            enviarMensaje("""
-                ERROR: Estas en un juego. No puedes enviar mensajes generales
-                Usa: FILA COLUMNA (ej: 0 1) para jugar
-                O escribe RENDIRSE para abandonar
-                """);
+            enviarMensaje("ERROR: Estas en un juego\nUsa: FILA COLUMNA o RENDIRSE\n");
             esperandoMenu = true;
             opcionMenu = "JUGAR_GATO";
             return;
@@ -309,7 +299,7 @@ public class UnCliente implements Runnable {
     
     private void invitarAJugarGato(String usuarioInvitado) throws IOException {
         if (usuarioInvitado.isEmpty()) {
-            enviarMensaje("ERROR: Usuario no puede estar vacio");
+            enviarMensaje("ERROR: Usuario vacio");
             return;
         }
         
@@ -351,8 +341,7 @@ public class UnCliente implements Runnable {
         
         if (ServidorMulti.gestorJuegos.enviarInvitacion(nombreUsuario, usuarioInvitado)) {
             enviarMensaje("Invitacion enviada a " + usuarioInvitado);
-            clienteInvitado.enviarMensaje("\n" + nombreUsuario + " te invita a jugar GATO!");
-            clienteInvitado.enviarMensaje("Responde: ACEPTAR o RECHAZAR");
+            clienteInvitado.enviarMensaje("\n" + nombreUsuario + " te invita a jugar GATO\nAceptar o Rechazar: ");
             clienteInvitado.esperandoMenu = true;
             clienteInvitado.opcionMenu = "RESPONDER_INVITACION";
             System.out.println(nombreUsuario + " invito a " + usuarioInvitado);
@@ -404,32 +393,18 @@ public class UnCliente implements Runnable {
     }
     
     private void iniciarPartida(JuegoGato juego) throws IOException {
-        enviarMensaje("""
-            
-            === JUEGO DEL GATO ===
-            Jugadores:
-              %s (X)
-              %s (O)
-            
-            Empieza: %s
-            Tu simbolo: %s
-            %s
-            """.formatted(
-                juego.getJugador1(),
-                juego.getJugador2(),
-                juego.getTurnoActual(),
-                juego.getSimbolo(nombreUsuario),
-                juego.obtenerTableroTexto()
-            ));
+        enviarMensaje("\n=== JUEGO DEL GATO ===");
+        enviarMensaje("Jugador 1: " + juego.getJugador1() + " (X)");
+        enviarMensaje("Jugador 2: " + juego.getJugador2() + " (O)");
+        enviarMensaje("Empieza: " + juego.getTurnoActual());
+        enviarMensaje("Tu simbolo: " + juego.getSimbolo(nombreUsuario));
+        enviarMensaje(juego.obtenerTableroTexto());
         
         if (juego.getTurnoActual().equals(nombreUsuario)) {
-            enviarMensaje("""
-                >>> ES TU TURNO <<<
-                Formato: FILA COLUMNA (ej: 0 1)
-                O escribe RENDIRSE para abandonar
-                """);
+            enviarMensaje(">>> ES TU TURNO <<<");
+            enviarMensaje("Escribe FILA COLUMNA (ej: 0 1) o RENDIRSE\n");
         } else {
-            enviarMensaje("Esperando a " + juego.getTurnoActual() + "...");
+            enviarMensaje("Esperando a " + juego.getTurnoActual() + "...\n");
         }
         
         esperandoMenu = true;
@@ -456,11 +431,7 @@ public class UnCliente implements Runnable {
             
             UnCliente clienteOponente = buscarClientePorNombre(oponente);
             if (clienteOponente != null) {
-                clienteOponente.enviarMensaje("""
-                    
-                    *** GANASTE ***
-                    %s se rindio
-                    """.formatted(nombreUsuario));
+                clienteOponente.enviarMensaje("\n*** GANASTE ***\n" + nombreUsuario + " se rindio\n");
                 clienteOponente.esperandoMenu = false;
                 clienteOponente.opcionMenu = "";
             }
@@ -476,7 +447,7 @@ public class UnCliente implements Runnable {
         
         String[] partes = entrada.trim().split("\\s+");
         if (partes.length != 2) {
-            enviarMensaje("ERROR: Formato incorrecto. Usa: FILA COLUMNA (ej: 0 1)");
+            enviarMensaje("ERROR: Formato incorrecto. Usa: FILA COLUMNA");
             return;
         }
         
@@ -497,19 +468,16 @@ public class UnCliente implements Runnable {
                     
                     UnCliente clienteOponente = buscarClientePorNombre(siguienteTurno);
                     if (clienteOponente != null) {
-                        clienteOponente.enviarMensaje("""
-                            
-                            >>> ES TU TURNO <<<
-                            Formato: FILA COLUMNA (ej: 0 1)
-                            O escribe RENDIRSE para abandonar
-                            """);
+                        clienteOponente.enviarMensaje("\n>>> ES TU TURNO <<<\nEscribe FILA COLUMNA o RENDIRSE\n");
+                        clienteOponente.esperandoMenu = true;
+                        clienteOponente.opcionMenu = "JUGAR_GATO";
                     }
                 }
             } else {
-                enviarMensaje("ERROR: Movimiento invalido. La casilla esta ocupada o fuera de rango");
+                enviarMensaje("ERROR: Movimiento invalido");
             }
         } catch (NumberFormatException e) {
-            enviarMensaje("ERROR: Debes ingresar numeros. Usa: FILA COLUMNA (ej: 0 1)");
+            enviarMensaje("ERROR: Debes ingresar numeros");
         }
     }
     
@@ -532,7 +500,7 @@ public class UnCliente implements Runnable {
         UnCliente cliente2 = buscarClientePorNombre(j2);
         
         if (resultado.isEmpate()) {
-            String mensajeEmpate = "\n*** EMPATE ***\n";
+            String mensajeEmpate = "\n=== EMPATE ===\nNadie gano\n";
             
             if (cliente1 != null) {
                 cliente1.enviarMensaje(mensajeEmpate);
@@ -545,7 +513,7 @@ public class UnCliente implements Runnable {
                 cliente2.opcionMenu = "";
             }
             
-            System.out.println("Partida terminada en empate: " + j1 + " vs " + j2);
+            System.out.println("Empate: " + j1 + " vs " + j2);
         } else {
             String ganador = resultado.getGanador();
             String perdedor = ganador.equals(j1) ? j2 : j1;
@@ -565,7 +533,7 @@ public class UnCliente implements Runnable {
                 clientePerdedor.opcionMenu = "";
             }
             
-            System.out.println("Partida terminada. Ganador: " + ganador);
+            System.out.println("Ganador: " + ganador);
         }
         
         ServidorMulti.gestorJuegos.eliminarJuego(juego);
@@ -579,19 +547,11 @@ public class UnCliente implements Runnable {
             return;
         }
         
-        enviarMensaje("""
-            
-            === ESTADO DEL JUEGO ===
-            Oponente: %s
-            Tu simbolo: %s
-            Turno actual: %s
-            %s
-            """.formatted(
-                juego.getOponente(nombreUsuario),
-                juego.getSimbolo(nombreUsuario),
-                juego.getTurnoActual(),
-                juego.obtenerTableroTexto()
-            ));
+        enviarMensaje("\n=== ESTADO DEL JUEGO ===");
+        enviarMensaje("Oponente: " + juego.getOponente(nombreUsuario));
+        enviarMensaje("Tu simbolo: " + juego.getSimbolo(nombreUsuario));
+        enviarMensaje("Turno actual: " + juego.getTurnoActual());
+        enviarMensaje(juego.obtenerTableroTexto());
         
         if (juego.getTurnoActual().equals(nombreUsuario)) {
             enviarMensaje(">>> ES TU TURNO <<<");
@@ -612,39 +572,39 @@ public class UnCliente implements Runnable {
     
     private void bloquearUsuario(String usuarioABloquear) throws IOException {
         if (usuarioABloquear.equals(nombreUsuario)) {
-            enviarMensaje("ERROR: No puedes bloquearte a ti mismo");
+            enviarMensaje("ERROR: No puedes bloquearte a ti mismo\n");
             return;
         }
         
         if (!ServidorMulti.db.existeUsuario(usuarioABloquear)) {
-            enviarMensaje("ERROR: Usuario '" + usuarioABloquear + "' no existe");
+            enviarMensaje("ERROR: Usuario no existe\n");
             return;
         }
         
         if (ServidorMulti.db.estaBloqueado(nombreUsuario, usuarioABloquear)) {
-            enviarMensaje("ERROR: Ya bloqueaste a '" + usuarioABloquear + "'");
+            enviarMensaje("ERROR: Ya bloqueaste a este usuario\n");
             return;
         }
         
         if (ServidorMulti.db.bloquearUsuario(nombreUsuario, usuarioABloquear)) {
-            enviarMensaje("OK: Bloqueaste a '" + usuarioABloquear + "'");
+            enviarMensaje("OK: Usuario bloqueado\n");
             System.out.println(nombreUsuario + " bloqueo a " + usuarioABloquear);
         } else {
-            enviarMensaje("ERROR: No se pudo bloquear");
+            enviarMensaje("ERROR: No se pudo bloquear\n");
         }
     }
     
     private void desbloquearUsuario(String usuarioADesbloquear) throws IOException {
         if (!ServidorMulti.db.estaBloqueado(nombreUsuario, usuarioADesbloquear)) {
-            enviarMensaje("ERROR: '" + usuarioADesbloquear + "' no esta bloqueado");
+            enviarMensaje("ERROR: Usuario no esta bloqueado\n");
             return;
         }
         
         if (ServidorMulti.db.desbloquearUsuario(nombreUsuario, usuarioADesbloquear)) {
-            enviarMensaje("OK: Desbloqueaste a '" + usuarioADesbloquear + "'");
+            enviarMensaje("OK: Usuario desbloqueado\n");
             System.out.println(nombreUsuario + " desbloqueo a " + usuarioADesbloquear);
         } else {
-            enviarMensaje("ERROR: No se pudo desbloquear");
+            enviarMensaje("ERROR: No se pudo desbloquear\n");
         }
     }
     
@@ -652,7 +612,7 @@ public class UnCliente implements Runnable {
         List<String> bloqueados = ServidorMulti.db.listarBloqueados(nombreUsuario);
         
         if (bloqueados.isEmpty()) {
-            enviarMensaje("No tienes usuarios bloqueados");
+            enviarMensaje("No tienes usuarios bloqueados\n");
             return;
         }
         
@@ -660,14 +620,14 @@ public class UnCliente implements Runnable {
         for (String bloqueado : bloqueados) {
             enviarMensaje("  - " + bloqueado);
         }
-        enviarMensaje("Total: " + bloqueados.size());
+        enviarMensaje("Total: " + bloqueados.size() + "\n");
     }
     
     private void listarUsuarios() throws IOException {
         List<String> usuarios = ServidorMulti.db.listarUsuarios();
         
         if (usuarios.isEmpty()) {
-            enviarMensaje("No hay usuarios registrados");
+            enviarMensaje("No hay usuarios registrados\n");
             return;
         }
         
@@ -692,20 +652,17 @@ public class UnCliente implements Runnable {
             
             enviarMensaje("  - " + usuario + estado);
         }
-        enviarMensaje("Total: " + usuarios.size());
+        enviarMensaje("Total: " + usuarios.size() + "\n");
     }
     
     private void mostrarMenuAutenticacion() throws IOException {
         enviarMensaje("""
             
-            *** LIMITE ALCANZADO ***
-            Debes autenticarte para continuar
-            
             1. Registrarse
             2. Iniciar sesion
+            3. Continuar como invitado
             
-            Elige (1 o 2):
-            """);
+            Opcion: """);
         esperandoMenu = true;
         opcionMenu = "ELEGIR";
     }
@@ -713,33 +670,38 @@ public class UnCliente implements Runnable {
     private void procesarMenuAutenticacion(String mensaje) throws IOException {
         if (mensaje.equals("1")) {
             opcionMenu = "REGISTRO_USUARIO";
-            enviarMensaje("\n=== REGISTRO ===\nUsuario:");
+            enviarMensaje("\n=== REGISTRO ===\nUsuario: ");
         } else if (mensaje.equals("2")) {
             opcionMenu = "LOGIN_USUARIO";
-            enviarMensaje("\n=== LOGIN ===\nUsuario:");
+            enviarMensaje("\n=== LOGIN ===\nUsuario: ");
+        } else if (mensaje.equals("3")) {
+            esperandoMenu = false;
+            opcionMenu = "";
+            enviarMensaje("\n=== MODO INVITADO ===\nTienes 3 mensajes gratis\n");
         } else {
-            enviarMensaje("ERROR: Escribe 1 o 2");
+            enviarMensaje("ERROR: Escribe 1, 2 o 3\n");
+            mostrarMenuAutenticacion();
         }
     }
     
     private void procesarRegistroUsuario(String mensaje) throws IOException {
         usuarioTemp = mensaje.trim();
         if (usuarioTemp.isEmpty()) {
-            enviarMensaje("ERROR: No puede estar vacio\nUsuario:");
+            enviarMensaje("ERROR: No puede estar vacio\nUsuario: ");
             return;
         }
         if (ServidorMulti.db.existeUsuario(usuarioTemp)) {
-            enviarMensaje("ERROR: Usuario ya existe\nUsuario:");
+            enviarMensaje("ERROR: Usuario ya existe\nUsuario: ");
             return;
         }
         opcionMenu = "REGISTRO_PASSWORD";
-        enviarMensaje("Contraseña:");
+        enviarMensaje("Contraseña: ");
     }
     
     private void procesarRegistroPassword(String mensaje) throws IOException {
         String password = mensaje.trim();
         if (password.isEmpty()) {
-            enviarMensaje("ERROR: No puede estar vacia\nContraseña:");
+            enviarMensaje("ERROR: No puede estar vacia\nContraseña: ");
             return;
         }
         
@@ -748,11 +710,12 @@ public class UnCliente implements Runnable {
             nombreUsuario = usuarioTemp;
             mensajesEnviados = 0;
             esperandoMenu = false;
-            enviarMensaje("\nOK: Registro exitoso!\nBienvenido " + nombreUsuario + "\n");
+            enviarMensaje("\nREGISTRO EXITOSO\nBienvenido " + nombreUsuario + "\n");
+            mostrarMenuSiAutenticado();
             System.out.println("Nuevo usuario: " + nombreUsuario);
         } else {
-            enviarMensaje("ERROR: No se pudo registrar");
-            opcionMenu = "ELEGIR";
+            enviarMensaje("ERROR: No se pudo registrar\n");
+            mostrarMenuAutenticacion();
         }
         usuarioTemp = "";
     }
@@ -760,7 +723,7 @@ public class UnCliente implements Runnable {
     private void procesarLoginUsuario(String mensaje) throws IOException {
         usuarioTemp = mensaje.trim();
         opcionMenu = "LOGIN_PASSWORD";
-        enviarMensaje("Contraseña:");
+        enviarMensaje("Contraseña: ");
     }
     
     private void procesarLoginPassword(String mensaje) throws IOException {
@@ -769,15 +732,11 @@ public class UnCliente implements Runnable {
             nombreUsuario = usuarioTemp;
             mensajesEnviados = 0;
             esperandoMenu = false;
-            enviarMensaje("\nOK: Bienvenido " + nombreUsuario + "\n");
+            enviarMensaje("\nINICIO DE SESION EXITOSO\nBienvenido " + nombreUsuario + "\n");
+            mostrarMenuSiAutenticado();
             System.out.println(nombreUsuario + " inicio sesion");
         } else {
-            enviarMensaje("""
-                
-                ERROR: Credenciales incorrectas
-                1. Reintentar
-                2. Registrarse
-                """);
+            enviarMensaje("\nERROR: Usuario o contraseña incorrectos\n\n1. Reintentar\n2. Registrarse\n\nOpcion: ");
             opcionMenu = "ELEGIR";
         }
         usuarioTemp = "";
@@ -788,23 +747,43 @@ public class UnCliente implements Runnable {
         salida.flush();
     }
     
+    private void mostrarMenuSiAutenticado() throws IOException {
+        if (autenticado) {
+            enviarMensaje("""
+                
+                === MENU ===
+                1. Enviar mensaje
+                2. Mensaje directo
+                3. Bloquear usuario
+                4. Desbloquear usuario
+                5. Ver bloqueados
+                6. Ver usuarios
+                7. Salir
+                --- JUEGO ---
+                8. Invitar a jugar
+                9. Ver estado juego
+                
+                Opcion: """);
+        }
+    }
+    
     private void enviarMensajeDirecto(String destinatario, String textoMensaje) throws IOException {
         UnCliente clienteDestino = buscarClientePorNombre(destinatario);
         
         if (clienteDestino == null) {
-            enviarMensaje("ERROR: Usuario '" + destinatario + "' no conectado");
+            enviarMensaje("ERROR: Usuario no conectado\n");
             return;
         }
         
         if (autenticado && clienteDestino.autenticado) {
             if (ServidorMulti.db.estaBloqueado(clienteDestino.nombreUsuario, nombreUsuario)) {
-                enviarMensaje("ERROR: No puedes enviar mensajes a '" + destinatario + "'");
+                enviarMensaje("ERROR: No puedes enviar mensajes a este usuario\n");
                 return;
             }
         }
         
         String prefijo = autenticado ? "[MD de " + nombreUsuario + "]" : "[MD de Invitado#" + miId + "]";
         clienteDestino.enviarMensaje(prefijo + ": " + textoMensaje);
-        enviarMensaje("ENVIADO -> " + destinatario);
+        enviarMensaje("ENVIADO -> " + destinatario + "\n");
     }
 }
