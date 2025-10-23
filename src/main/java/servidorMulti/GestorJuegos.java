@@ -5,11 +5,11 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-public class gestorJuegos {
+public class GestorJuegos {
     private final Map<String, String> invitacionesPendientes;
     private final Map<String, JuegoGato> juegosActivos;
     
-    public gestorJuegos() {
+    public GestorJuegos() {
         this.invitacionesPendientes = new HashMap<>();
         this.juegosActivos = new HashMap<>();
     }
