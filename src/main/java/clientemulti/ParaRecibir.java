@@ -70,6 +70,10 @@ public class ParaRecibir implements Runnable {
             JUEGO DEL GATO:
             8. Invitar a jugar
             9. Ver estado del juego
+            ------------------------------------
+            RANKINGS:
+            10. Ver ranking general
+            11. Comparar jugadores
             ====================================
             """);
         System.out.print("Opcion: ");
