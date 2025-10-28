@@ -53,6 +53,10 @@ public class UnCliente implements Runnable {
                 }
                 
                 if (mensaje.equals("1")) {
+                    if (autenticado && ServidorMulti.gestorJuegos.obtenerJuego(nombreUsuario) != null) {
+                        enviarMensaje("ERROR: No puedes enviar mensajes mientras estas en un juego\n");
+                        continue;
+                    }
                     enviarMensaje("Escribe tu mensaje:");
                     esperandoMenu = true;
                     opcionMenu = "ENVIAR_MENSAJE";
@@ -62,6 +66,10 @@ public class UnCliente implements Runnable {
                 if (mensaje.equals("2")) {
                     if (!autenticado) {
                         enviarMensaje("ERROR: Debes iniciar sesion");
+                        continue;
+                    }
+                    if (ServidorMulti.gestorJuegos.obtenerJuego(nombreUsuario) != null) {
+                        enviarMensaje("ERROR: No puedes enviar mensajes mientras estas en un juego\n");
                         continue;
                     }
                     enviarMensaje("Usuario destinatario:");
@@ -130,6 +138,26 @@ public class UnCliente implements Runnable {
                     continue;
                 }
                 
+                if (mensaje.equals("10")) {
+                    if (!autenticado) {
+                        enviarMensaje("ERROR: Debes iniciar sesion");
+                        continue;
+                    }
+                    mostrarRankingGeneral();
+                    continue;
+                }
+                
+                if (mensaje.equals("11")) {
+                    if (!autenticado) {
+                        enviarMensaje("ERROR: Debes iniciar sesion");
+                        continue;
+                    }
+                    enviarMensaje("Primer jugador:");
+                    esperandoMenu = true;
+                    opcionMenu = "COMPARAR_J1";
+                    continue;
+                }
+                
                 if (mensaje.equalsIgnoreCase("salir") || mensaje.equals("7")) {
                     enviarMensaje("Cerrando conexion...");
                     socket.close();
@@ -156,6 +184,10 @@ public class UnCliente implements Runnable {
                 String prefijo = autenticado ? "[" + nombreUsuario + "]" : "[Invitado#" + miId + "]";
                 for (UnCliente cliente : ServidorMulti.clientes.values()) {
                     if (cliente.miId != this.miId) {
+                        if (cliente.autenticado && ServidorMulti.gestorJuegos.obtenerJuego(cliente.nombreUsuario) != null) {
+                            continue;
+                        }
+                        
                         if (cliente.autenticado && autenticado) {
                             if (ServidorMulti.db.estaBloqueado(cliente.nombreUsuario, nombreUsuario)) {
                                 continue;
@@ -179,6 +211,10 @@ public class UnCliente implements Runnable {
             String ganadorPorDesconexion = ServidorMulti.gestorJuegos.finalizarJuegoPorDesconexion(nombreUsuario);
             if (ganadorPorDesconexion != null) {
                 System.out.println(nombreUsuario + " se desconecto. " + ganadorPorDesconexion + " gana por abandono");
+                
+                JuegoGato juegoTemp = new JuegoGato(nombreUsuario, ganadorPorDesconexion);
+                ServidorMulti.db.registrarPartida(juegoTemp.getJugador1(), juegoTemp.getJugador2(), ganadorPorDesconexion, false);
+                
                 notificarGanadorPorDesconexion(ganadorPorDesconexion, nombreUsuario);
             }
         }
@@ -251,6 +287,19 @@ public class UnCliente implements Runnable {
                 procesarMovimientoGato(mensaje.trim());
                 break;
                 
+            case "COMPARAR_J1":
+                usuarioTemp = mensaje.trim();
+                enviarMensaje("Segundo jugador:");
+                opcionMenu = "COMPARAR_J2";
+                break;
+                
+            case "COMPARAR_J2":
+                compararJugadores(usuarioTemp, mensaje.trim());
+                esperandoMenu = false;
+                opcionMenu = "";
+                usuarioTemp = "";
+                break;
+                
             case "ELEGIR":
                 procesarMenuAutenticacion(mensaje);
                 break;
@@ -289,6 +338,10 @@ public class UnCliente implements Runnable {
         String prefijo = autenticado ? "[" + nombreUsuario + "]" : "[Invitado#" + miId + "]";
         for (UnCliente cliente : ServidorMulti.clientes.values()) {
             if (cliente.miId != this.miId) {
+                if (cliente.autenticado && ServidorMulti.gestorJuegos.obtenerJuego(cliente.nombreUsuario) != null) {
+                    continue;
+                }
+                
                 if (cliente.autenticado && autenticado) {
                     if (ServidorMulti.db.estaBloqueado(cliente.nombreUsuario, nombreUsuario)) {
                         continue;
@@ -427,6 +480,9 @@ public class UnCliente implements Runnable {
         
         if (entrada.equalsIgnoreCase("RENDIRSE")) {
             String oponente = juego.getOponente(nombreUsuario);
+            
+            ServidorMulti.db.registrarPartida(juego.getJugador1(), juego.getJugador2(), oponente, false);
+            
             ServidorMulti.gestorJuegos.eliminarJuego(juego);
             
             enviarMensaje("\nTe rendiste. " + oponente + " gana!");
@@ -504,6 +560,8 @@ public class UnCliente implements Runnable {
         UnCliente cliente2 = buscarClientePorNombre(j2);
         
         if (resultado.isEmpate()) {
+            ServidorMulti.db.registrarPartida(j1, j2, null, true);
+            
             String mensajeEmpate = "\n=== EMPATE ===\nNadie gano\n";
             
             if (cliente1 != null) {
@@ -521,6 +579,8 @@ public class UnCliente implements Runnable {
         } else {
             String ganador = resultado.getGanador();
             String perdedor = ganador.equals(j1) ? j2 : j1;
+            
+            ServidorMulti.db.registrarPartida(j1, j2, ganador, false);
             
             UnCliente clienteGanador = buscarClientePorNombre(ganador);
             UnCliente clientePerdedor = buscarClientePorNombre(perdedor);
@@ -562,6 +622,46 @@ public class UnCliente implements Runnable {
         } else {
             enviarMensaje("Esperando movimiento...");
         }
+    }
+    
+    private void mostrarRankingGeneral() throws IOException {
+        List<String> ranking = ServidorMulti.db.obtenerRankingGeneral();
+        
+        if (ranking.isEmpty()) {
+            enviarMensaje("\nNo hay partidas registradas aun\n");
+            return;
+        }
+        
+        enviarMensaje("\n=== RANKING GENERAL DEL GATO ===\n");
+        for (String linea : ranking) {
+            enviarMensaje(linea);
+        }
+        enviarMensaje("\nVictoria = 2 puntos | Empate = 1 punto\n");
+    }
+    
+    private void compararJugadores(String jugador1, String jugador2) throws IOException {
+        if (jugador1.isEmpty() || jugador2.isEmpty()) {
+            enviarMensaje("ERROR: Nombres de jugadores vacios\n");
+            return;
+        }
+        
+        if (!ServidorMulti.db.existeUsuario(jugador1)) {
+            enviarMensaje("ERROR: " + jugador1 + " no existe\n");
+            return;
+        }
+        
+        if (!ServidorMulti.db.existeUsuario(jugador2)) {
+            enviarMensaje("ERROR: " + jugador2 + " no existe\n");
+            return;
+        }
+        
+        if (jugador1.equals(jugador2)) {
+            enviarMensaje("ERROR: Debes comparar dos jugadores diferentes\n");
+            return;
+        }
+        
+        String estadisticas = ServidorMulti.db.obtenerEstadisticasEntreJugadores(jugador1, jugador2);
+        enviarMensaje(estadisticas);
     }
     
     private UnCliente buscarClientePorNombre(String nombre) {
@@ -776,9 +876,14 @@ public class UnCliente implements Runnable {
                 5. Ver bloqueados
                 6. Ver usuarios
                 7. Salir
-                --- JUEGO ---
+                ---------------------
+                JUEGO DEL GATO:
                 8. Invitar a jugar
                 9. Ver estado juego
+                ---------------------
+                RANKINGS:
+                10. Ver ranking general
+                11. Comparar jugadores
                 
                 Opcion: """);
         }
@@ -789,6 +894,11 @@ public class UnCliente implements Runnable {
         
         if (clienteDestino == null) {
             enviarMensaje("ERROR: Usuario no conectado\n");
+            return;
+        }
+        
+        if (ServidorMulti.gestorJuegos.obtenerJuego(destinatario) != null) {
+            enviarMensaje("ERROR: " + destinatario + " esta en un juego, no puede recibir mensajes\n");
             return;
         }
         
