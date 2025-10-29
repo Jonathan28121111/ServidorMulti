@@ -67,17 +67,84 @@ public class DatabaseManager {
             )
         """;
         
+        String sqlGrupos = """
+            CREATE TABLE IF NOT EXISTS grupos (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                nombre TEXT UNIQUE NOT NULL,
+                creador TEXT NOT NULL,
+                es_sistema INTEGER DEFAULT 0,
+                fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (creador) REFERENCES usuarios(username)
+            )
+        """;
+        
+        String sqlMiembrosGrupo = """
+            CREATE TABLE IF NOT EXISTS miembros_grupo (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                grupo_id INTEGER NOT NULL,
+                username TEXT NOT NULL,
+                fecha_union TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(grupo_id, username),
+                FOREIGN KEY (grupo_id) REFERENCES grupos(id),
+                FOREIGN KEY (username) REFERENCES usuarios(username)
+            )
+        """;
+        
+        String sqlMensajesGrupo = """
+            CREATE TABLE IF NOT EXISTS mensajes_grupo (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                grupo_id INTEGER NOT NULL,
+                remitente TEXT NOT NULL,
+                mensaje TEXT NOT NULL,
+                fecha_envio TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (grupo_id) REFERENCES grupos(id),
+                FOREIGN KEY (remitente) REFERENCES usuarios(username)
+            )
+        """;
+        
+        String sqlMensajesLeidos = """
+            CREATE TABLE IF NOT EXISTS mensajes_leidos (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                usuario TEXT NOT NULL,
+                mensaje_id INTEGER NOT NULL,
+                fecha_lectura TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(usuario, mensaje_id),
+                FOREIGN KEY (usuario) REFERENCES usuarios(username),
+                FOREIGN KEY (mensaje_id) REFERENCES mensajes_grupo(id)
+            )
+        """;
+        
         try (Statement stmt = connection.createStatement()) {
             stmt.execute(sqlUsuarios);
             stmt.execute(sqlBloqueos);
             stmt.execute(sqlEstadisticas);
             stmt.execute(sqlHistorialPartidas);
+            stmt.execute(sqlGrupos);
+            stmt.execute(sqlMiembrosGrupo);
+            stmt.execute(sqlMensajesGrupo);
+            stmt.execute(sqlMensajesLeidos);
             System.out.println("Tablas creadas/verificadas correctamente");
+            
+            crearGrupoTodos();
         } catch (SQLException e) {
             System.err.println("Error al crear tablas: " + e.getMessage());
         }
     }
     
+    private void crearGrupoTodos() {
+        String sqlVerificar = "SELECT id FROM grupos WHERE nombre = 'Todos'";
+        try (Statement stmt = connection.createStatement();
+             ResultSet rs = stmt.executeQuery(sqlVerificar)) {
+            
+            if (!rs.next()) {
+                String sqlCrear = "INSERT INTO grupos (nombre, creador, es_sistema) VALUES ('Todos', 'sistema', 1)";
+                stmt.execute(sqlCrear);
+                System.out.println("Grupo 'Todos' creado");
+            }
+        } catch (SQLException e) {
+            System.err.println("Error al crear grupo Todos: " + e.getMessage());
+        }
+    }
     
     public boolean registrarUsuario(String username, String password) {
         String sql = "INSERT INTO usuarios (username, password) VALUES (?, ?)";
@@ -87,9 +154,20 @@ public class DatabaseManager {
             pstmt.executeUpdate();
             
             inicializarEstadisticas(username);
+            agregarUsuarioAGrupoTodos(username);
             return true;
         } catch (SQLException e) {
             return false;
+        }
+    }
+    
+    private void agregarUsuarioAGrupoTodos(String username) {
+        String sql = "INSERT INTO miembros_grupo (grupo_id, username) SELECT id, ? FROM grupos WHERE nombre = 'Todos'";
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            pstmt.setString(1, username);
+            pstmt.executeUpdate();
+        } catch (SQLException e) {
+            System.err.println("Error al agregar usuario a grupo Todos: " + e.getMessage());
         }
     }
     
@@ -142,7 +220,6 @@ public class DatabaseManager {
         }
         return usuarios;
     }
-    
     
     public boolean bloquearUsuario(String bloqueador, String bloqueado) {
         if (bloqueador.equals(bloqueado)) {
@@ -375,6 +452,281 @@ public class DatabaseManager {
         return resultado.toString();
     }
     
+    public boolean crearGrupo(String nombreGrupo, String creador) {
+        if (nombreGrupo.equalsIgnoreCase("Todos")) {
+            return false;
+        }
+        
+        String sql = "INSERT INTO grupos (nombre, creador, es_sistema) VALUES (?, ?, 0)";
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            pstmt.setString(1, nombreGrupo);
+            pstmt.setString(2, creador);
+            pstmt.executeUpdate();
+            
+            unirseAGrupo(nombreGrupo, creador);
+            return true;
+        } catch (SQLException e) {
+            return false;
+        }
+    }
+    
+    public boolean borrarGrupo(String nombreGrupo, String solicitante) {
+        if (nombreGrupo.equalsIgnoreCase("Todos")) {
+            return false;
+        }
+        
+        String sqlVerificar = "SELECT creador FROM grupos WHERE nombre = ? AND es_sistema = 0";
+        try (PreparedStatement pstmt = connection.prepareStatement(sqlVerificar)) {
+            pstmt.setString(1, nombreGrupo);
+            ResultSet rs = pstmt.executeQuery();
+            
+            if (!rs.next()) {
+                return false;
+            }
+            
+            String creador = rs.getString("creador");
+            if (!creador.equals(solicitante)) {
+                return false;
+            }
+            
+            String sqlGrupoId = "SELECT id FROM grupos WHERE nombre = ?";
+            try (PreparedStatement pstmt2 = connection.prepareStatement(sqlGrupoId)) {
+                pstmt2.setString(1, nombreGrupo);
+                ResultSet rs2 = pstmt2.executeQuery();
+                
+                if (rs2.next()) {
+                    int grupoId = rs2.getInt("id");
+                    
+                    String sqlBorrarMensajes = "DELETE FROM mensajes_grupo WHERE grupo_id = ?";
+                    String sqlBorrarMiembros = "DELETE FROM miembros_grupo WHERE grupo_id = ?";
+                    String sqlBorrarGrupo = "DELETE FROM grupos WHERE id = ?";
+                    
+                    try (PreparedStatement pstmt3 = connection.prepareStatement(sqlBorrarMensajes);
+                         PreparedStatement pstmt4 = connection.prepareStatement(sqlBorrarMiembros);
+                         PreparedStatement pstmt5 = connection.prepareStatement(sqlBorrarGrupo)) {
+                        
+                        pstmt3.setInt(1, grupoId);
+                        pstmt3.executeUpdate();
+                        
+                        pstmt4.setInt(1, grupoId);
+                        pstmt4.executeUpdate();
+                        
+                        pstmt5.setInt(1, grupoId);
+                        pstmt5.executeUpdate();
+                        
+                        return true;
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            System.err.println("Error al borrar grupo: " + e.getMessage());
+        }
+        return false;
+    }
+    
+    public boolean unirseAGrupo(String nombreGrupo, String username) {
+        String sqlGrupoId = "SELECT id FROM grupos WHERE nombre = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(sqlGrupoId)) {
+            pstmt.setString(1, nombreGrupo);
+            ResultSet rs = pstmt.executeQuery();
+            
+            if (rs.next()) {
+                int grupoId = rs.getInt("id");
+                
+                String sqlUnirse = "INSERT INTO miembros_grupo (grupo_id, username) VALUES (?, ?)";
+                try (PreparedStatement pstmt2 = connection.prepareStatement(sqlUnirse)) {
+                    pstmt2.setInt(1, grupoId);
+                    pstmt2.setString(2, username);
+                    pstmt2.executeUpdate();
+                    return true;
+                } catch (SQLException e) {
+                    return false;
+                }
+            }
+        } catch (SQLException e) {
+            System.err.println("Error al unirse a grupo: " + e.getMessage());
+        }
+        return false;
+    }
+    
+    public boolean salirDeGrupo(String nombreGrupo, String username) {
+        if (nombreGrupo.equalsIgnoreCase("Todos")) {
+            return false;
+        }
+        
+        String sqlGrupoId = "SELECT id FROM grupos WHERE nombre = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(sqlGrupoId)) {
+            pstmt.setString(1, nombreGrupo);
+            ResultSet rs = pstmt.executeQuery();
+            
+            if (rs.next()) {
+                int grupoId = rs.getInt("id");
+                
+                String sqlSalir = "DELETE FROM miembros_grupo WHERE grupo_id = ? AND username = ?";
+                try (PreparedStatement pstmt2 = connection.prepareStatement(sqlSalir)) {
+                    pstmt2.setInt(1, grupoId);
+                    pstmt2.setString(2, username);
+                    int rows = pstmt2.executeUpdate();
+                    return rows > 0;
+                }
+            }
+        } catch (SQLException e) {
+            System.err.println("Error al salir de grupo: " + e.getMessage());
+        }
+        return false;
+    }
+    
+    public boolean existeGrupo(String nombreGrupo) {
+        String sql = "SELECT 1 FROM grupos WHERE nombre = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            pstmt.setString(1, nombreGrupo);
+            ResultSet rs = pstmt.executeQuery();
+            return rs.next();
+        } catch (SQLException e) {
+            System.err.println("Error al verificar grupo: " + e.getMessage());
+        }
+        return false;
+    }
+    
+    public boolean esMiembroDeGrupo(String nombreGrupo, String username) {
+        String sql = """
+            SELECT 1 FROM miembros_grupo mg
+            JOIN grupos g ON mg.grupo_id = g.id
+            WHERE g.nombre = ? AND mg.username = ?
+        """;
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            pstmt.setString(1, nombreGrupo);
+            pstmt.setString(2, username);
+            ResultSet rs = pstmt.executeQuery();
+            return rs.next();
+        } catch (SQLException e) {
+            System.err.println("Error al verificar membresia: " + e.getMessage());
+        }
+        return false;
+    }
+    
+    public List<String> listarGrupos() {
+        List<String> grupos = new ArrayList<>();
+        String sql = "SELECT nombre FROM grupos ORDER BY es_sistema DESC, nombre";
+        try (Statement stmt = connection.createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
+            while (rs.next()) {
+                grupos.add(rs.getString("nombre"));
+            }
+        } catch (SQLException e) {
+            System.err.println("Error al listar grupos: " + e.getMessage());
+        }
+        return grupos;
+    }
+    
+    public List<String> listarGruposDeUsuario(String username) {
+        List<String> grupos = new ArrayList<>();
+        String sql = """
+            SELECT g.nombre FROM grupos g
+            JOIN miembros_grupo mg ON g.id = mg.grupo_id
+            WHERE mg.username = ?
+            ORDER BY g.es_sistema DESC, g.nombre
+        """;
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            pstmt.setString(1, username);
+            ResultSet rs = pstmt.executeQuery();
+            while (rs.next()) {
+                grupos.add(rs.getString("nombre"));
+            }
+        } catch (SQLException e) {
+            System.err.println("Error al listar grupos de usuario: " + e.getMessage());
+        }
+        return grupos;
+    }
+    
+    public List<String> listarMiembrosDeGrupo(String nombreGrupo) {
+        List<String> miembros = new ArrayList<>();
+        String sql = """
+            SELECT mg.username FROM miembros_grupo mg
+            JOIN grupos g ON mg.grupo_id = g.id
+            WHERE g.nombre = ?
+            ORDER BY mg.username
+        """;
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            pstmt.setString(1, nombreGrupo);
+            ResultSet rs = pstmt.executeQuery();
+            while (rs.next()) {
+                miembros.add(rs.getString("username"));
+            }
+        } catch (SQLException e) {
+            System.err.println("Error al listar miembros: " + e.getMessage());
+        }
+        return miembros;
+    }
+    
+    public boolean guardarMensajeGrupo(String nombreGrupo, String remitente, String mensaje) {
+        String sqlGrupoId = "SELECT id FROM grupos WHERE nombre = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(sqlGrupoId)) {
+            pstmt.setString(1, nombreGrupo);
+            ResultSet rs = pstmt.executeQuery();
+            
+            if (rs.next()) {
+                int grupoId = rs.getInt("id");
+                
+                String sqlInsert = "INSERT INTO mensajes_grupo (grupo_id, remitente, mensaje) VALUES (?, ?, ?)";
+                try (PreparedStatement pstmt2 = connection.prepareStatement(sqlInsert)) {
+                    pstmt2.setInt(1, grupoId);
+                    pstmt2.setString(2, remitente);
+                    pstmt2.setString(3, mensaje);
+                    pstmt2.executeUpdate();
+                    return true;
+                }
+            }
+        } catch (SQLException e) {
+            System.err.println("Error al guardar mensaje: " + e.getMessage());
+        }
+        return false;
+    }
+    
+    public List<String> obtenerMensajesNoLeidosDeGrupo(String nombreGrupo, String username) {
+        List<String> mensajes = new ArrayList<>();
+        String sql = """
+            SELECT mg.id, mg.remitente, mg.mensaje, mg.fecha_envio
+            FROM mensajes_grupo mg
+            JOIN grupos g ON mg.grupo_id = g.id
+            WHERE g.nombre = ?
+            AND mg.id NOT IN (
+                SELECT mensaje_id FROM mensajes_leidos WHERE usuario = ?
+            )
+            ORDER BY mg.fecha_envio
+        """;
+        
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            pstmt.setString(1, nombreGrupo);
+            pstmt.setString(2, username);
+            ResultSet rs = pstmt.executeQuery();
+            
+            while (rs.next()) {
+                int mensajeId = rs.getInt("id");
+                String remitente = rs.getString("remitente");
+                String mensaje = rs.getString("mensaje");
+                
+                mensajes.add("[" + remitente + "]: " + mensaje);
+                
+                marcarMensajeComoLeido(username, mensajeId);
+            }
+        } catch (SQLException e) {
+            System.err.println("Error al obtener mensajes no leidos: " + e.getMessage());
+        }
+        
+        return mensajes;
+    }
+    
+    private void marcarMensajeComoLeido(String username, int mensajeId) {
+        String sql = "INSERT INTO mensajes_leidos (usuario, mensaje_id) VALUES (?, ?)";
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            pstmt.setString(1, username);
+            pstmt.setInt(2, mensajeId);
+            pstmt.executeUpdate();
+        } catch (SQLException e) {
+        }
+    }
+    
     public void cerrar() {
         try {
             if (connection != null && !connection.isClosed()) {
@@ -385,4 +737,4 @@ public class DatabaseManager {
             System.err.println("Error al cerrar conexion: " + e.getMessage());
         }
     }
-}
+}       
