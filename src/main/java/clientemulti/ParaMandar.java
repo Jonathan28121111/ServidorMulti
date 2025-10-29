@@ -35,11 +35,13 @@ public class ParaMandar implements Runnable {
                     socket.close();
                     break;
                 }
-                
-                Thread.sleep(100);
+               
+                Thread.sleep(50);
             }
         } catch (Exception ex) {
-            System.out.println("Conexion cerrada");
+            if (!socket.isClosed()) {
+                System.out.println("Conexion cerrada");
+            }
         }
     }
 }
