@@ -34,6 +34,14 @@ public class UnCliente implements Runnable {
             
             while (!socket.isClosed()) {
                 String mensaje = entrada.readUTF();
+                if (autenticado) {
+                    JuegoGato juegoActivo = ServidorMulti.gestorJuegos.obtenerJuego(nombreUsuario);
+                    if (juegoActivo != null && juegoActivo.isJuegoActivo()) {
+                        System.out.println("[DEBUG] " + nombreUsuario + " en juego activo, procesando: " + mensaje);
+                        procesarMovimientoGato(mensaje.trim());
+                        continue;
+                    }
+                }
                 
                 if (autenticado && !esperandoMenu) {
                     if (ServidorMulti.gestorJuegos.tieneInvitacionPendiente(nombreUsuario)) {
@@ -450,6 +458,10 @@ public class UnCliente implements Runnable {
     }
     
     private void iniciarPartida(JuegoGato juego) throws IOException {
+        System.out.println("[DEBUG] Iniciando partida para " + nombreUsuario);
+        System.out.println("[DEBUG] Juego activo: " + juego.isJuegoActivo());
+        System.out.println("[DEBUG] Usuario autenticado: " + autenticado);
+        
         enviarMensaje("\n=== JUEGO DEL GATO ===");
         enviarMensaje("Jugador 1: " + juego.getJugador1() + " (X)");
         enviarMensaje("Jugador 2: " + juego.getJugador2() + " (O)");
@@ -463,9 +475,6 @@ public class UnCliente implements Runnable {
         } else {
             enviarMensaje("Esperando a " + juego.getTurnoActual() + "...\n");
         }
-        
-        esperandoMenu = true;
-        opcionMenu = "JUGAR_GATO";
     }
     
     private void procesarMovimientoGato(String entrada) throws IOException {
@@ -507,7 +516,7 @@ public class UnCliente implements Runnable {
         
         String[] partes = entrada.trim().split("\\s+");
         if (partes.length != 2) {
-            enviarMensaje("ERROR: Formato incorrecto. Usa: FILA COLUMNA");
+            enviarMensaje("ERROR: Formato incorrecto. Usa: FILA COLUMNA (ej: 0 1)");
             return;
         }
         
@@ -528,16 +537,14 @@ public class UnCliente implements Runnable {
                     
                     UnCliente clienteOponente = buscarClientePorNombre(siguienteTurno);
                     if (clienteOponente != null) {
-                        clienteOponente.enviarMensaje("\n>>> ES TU TURNO <<<\nEscribe FILA COLUMNA o RENDIRSE\n");
-                        clienteOponente.esperandoMenu = true;
-                        clienteOponente.opcionMenu = "JUGAR_GATO";
+                        clienteOponente.enviarMensaje("\n>>> ES TU TURNO <<<\nEscribe FILA COLUMNA (ej: 0 1) o RENDIRSE\n");
                     }
                 }
             } else {
-                enviarMensaje("ERROR: Movimiento invalido");
+                enviarMensaje("ERROR: Movimiento invalido. La casilla puede estar ocupada o fuera de rango (0-2)");
             }
         } catch (NumberFormatException e) {
-            enviarMensaje("ERROR: Debes ingresar numeros");
+            enviarMensaje("ERROR: Debes ingresar numeros. Ejemplo: 0 1");
         }
     }
     
@@ -632,11 +639,15 @@ public class UnCliente implements Runnable {
             return;
         }
         
-        enviarMensaje("\n=== RANKING GENERAL DEL GATO ===\n");
+        // CAMBIO PRINCIPAL: Enviar todo el ranking en un solo mensaje
+        StringBuilder sb = new StringBuilder();
+        sb.append("\n=== RANKING GENERAL DEL GATO ===\n\n");
         for (String linea : ranking) {
-            enviarMensaje(linea);
+            sb.append(linea).append("\n");
         }
-        enviarMensaje("\nVictoria = 2 puntos | Empate = 1 punto\n");
+        sb.append("\nVictoria = 2 puntos | Empate = 1 punto\n");
+        
+        enviarMensaje(sb.toString());
     }
     
     private void compararJugadores(String jugador1, String jugador2) throws IOException {
