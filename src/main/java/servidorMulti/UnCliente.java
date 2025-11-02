@@ -18,6 +18,7 @@ public class UnCliente implements Runnable {
     private String opcionMenu = "";
     private String usuarioTemp = "";
     private String destinatarioTemp = "";
+    private String grupoActual = "Todos";
     
     UnCliente(Socket s, int id) throws IOException {
         this.miId = id;
@@ -166,6 +167,99 @@ public class UnCliente implements Runnable {
                     continue;
                 }
                 
+                if (mensaje.equals("12")) {
+                    if (!autenticado) {
+                        enviarMensaje("ERROR: Debes iniciar sesion");
+                        continue;
+                    }
+                    listarGrupos();
+                    continue;
+                }
+                
+                if (mensaje.equals("13")) {
+                    if (!autenticado) {
+                        enviarMensaje("ERROR: Debes iniciar sesion");
+                        continue;
+                    }
+                    enviarMensaje("Nombre del grupo:");
+                    esperandoMenu = true;
+                    opcionMenu = "CREAR_GRUPO";
+                    continue;
+                }
+                
+                if (mensaje.equals("14")) {
+                    if (!autenticado) {
+                        enviarMensaje("ERROR: Debes iniciar sesion");
+                        continue;
+                    }
+                    enviarMensaje("Nombre del grupo a unirse:");
+                    esperandoMenu = true;
+                    opcionMenu = "UNIRSE_GRUPO";
+                    continue;
+                }
+                
+                if (mensaje.equals("15")) {
+                    if (!autenticado) {
+                        enviarMensaje("ERROR: Debes iniciar sesion");
+                        continue;
+                    }
+                    enviarMensaje("Nombre del grupo a salir:");
+                    esperandoMenu = true;
+                    opcionMenu = "SALIR_GRUPO";
+                    continue;
+                }
+                
+                if (mensaje.equals("16")) {
+                    if (!autenticado) {
+                        enviarMensaje("ERROR: Debes iniciar sesion");
+                        continue;
+                    }
+                    enviarMensaje("Nombre del grupo a borrar:");
+                    esperandoMenu = true;
+                    opcionMenu = "BORRAR_GRUPO";
+                    continue;
+                }
+                
+                if (mensaje.equals("17")) {
+                    if (!autenticado) {
+                        enviarMensaje("ERROR: Debes iniciar sesion");
+                        continue;
+                    }
+                    enviarMensaje("Nombre del grupo a cambiar:");
+                    esperandoMenu = true;
+                    opcionMenu = "CAMBIAR_GRUPO";
+                    continue;
+                }
+                
+                if (mensaje.equals("18")) {
+                    if (!autenticado) {
+                        enviarMensaje("ERROR: Debes iniciar sesion");
+                        continue;
+                    }
+                    mostrarGrupoActual();
+                    continue;
+                }
+                
+                if (mensaje.equals("19")) {
+                    if (!autenticado) {
+                        enviarMensaje("ERROR: Debes iniciar sesion");
+                        continue;
+                    }
+                    listarMisGrupos();
+                    continue;
+                }
+                
+                if (mensaje.equals("20")) {
+                    if (!autenticado) {
+                        enviarMensaje("ERROR: Debes iniciar sesion");
+                        continue;
+                    }
+                    enviarMensaje("Nombre del grupo:");
+                    esperandoMenu = true;
+                    opcionMenu = "VER_MIEMBROS_GRUPO";
+                    continue;
+                }
+                
                 if (mensaje.equalsIgnoreCase("salir") || mensaje.equals("7")) {
                     enviarMensaje("Cerrando conexion...");
                     socket.close();
@@ -190,17 +284,33 @@ public class UnCliente implements Runnable {
                 }
                 
                 String prefijo = autenticado ? "[" + nombreUsuario + "]" : "[Invitado#" + miId + "]";
+                
+                if (autenticado) {
+                    ServidorMulti.db.guardarMensajeGrupo(grupoActual, nombreUsuario, mensaje);
+                }
+                
                 for (UnCliente cliente : ServidorMulti.clientes.values()) {
                     if (cliente.miId != this.miId) {
                         if (cliente.autenticado && ServidorMulti.gestorJuegos.obtenerJuego(cliente.nombreUsuario) != null) {
                             continue;
                         }
                         
-                        if (cliente.autenticado && autenticado) {
+                        if (autenticado && cliente.autenticado) {
+                            if (!cliente.grupoActual.equals(grupoActual)) {
+                                continue;
+                            }
+                            
                             if (ServidorMulti.db.estaBloqueado(cliente.nombreUsuario, nombreUsuario)) {
                                 continue;
                             }
+                        } else if (!autenticado && cliente.autenticado) {
+                            if (!cliente.grupoActual.equals("Todos")) {
+                                continue;
+                            }
+                        } else if (autenticado && !cliente.autenticado) {
+                            continue;
                         }
+                        
                         cliente.enviarMensaje(prefijo + ": " + mensaje);
                     }
                 }
@@ -308,6 +418,42 @@ public class UnCliente implements Runnable {
                 usuarioTemp = "";
                 break;
                 
+            case "CREAR_GRUPO":
+                crearGrupo(mensaje.trim());
+                esperandoMenu = false;
+                opcionMenu = "";
+                break;
+                
+            case "UNIRSE_GRUPO":
+                unirseAGrupo(mensaje.trim());
+                esperandoMenu = false;
+                opcionMenu = "";
+                break;
+                
+            case "SALIR_GRUPO":
+                salirDeGrupo(mensaje.trim());
+                esperandoMenu = false;
+                opcionMenu = "";
+                break;
+                
+            case "BORRAR_GRUPO":
+                borrarGrupo(mensaje.trim());
+                esperandoMenu = false;
+                opcionMenu = "";
+                break;
+                
+            case "CAMBIAR_GRUPO":
+                cambiarGrupoActual(mensaje.trim());
+                esperandoMenu = false;
+                opcionMenu = "";
+                break;
+                
+            case "VER_MIEMBROS_GRUPO":
+                verMiembrosGrupo(mensaje.trim());
+                esperandoMenu = false;
+                opcionMenu = "";
+                break;
+                
             case "ELEGIR":
                 procesarMenuAutenticacion(mensaje);
                 break;
@@ -344,22 +490,260 @@ public class UnCliente implements Runnable {
         }
         
         String prefijo = autenticado ? "[" + nombreUsuario + "]" : "[Invitado#" + miId + "]";
+        
+        if (autenticado) {
+            ServidorMulti.db.guardarMensajeGrupo(grupoActual, nombreUsuario, mensaje);
+        }
+        
         for (UnCliente cliente : ServidorMulti.clientes.values()) {
             if (cliente.miId != this.miId) {
                 if (cliente.autenticado && ServidorMulti.gestorJuegos.obtenerJuego(cliente.nombreUsuario) != null) {
                     continue;
                 }
                 
-                if (cliente.autenticado && autenticado) {
+                if (autenticado && cliente.autenticado) {
+                    if (!cliente.grupoActual.equals(grupoActual)) {
+                        continue;
+                    }
+                    
                     if (ServidorMulti.db.estaBloqueado(cliente.nombreUsuario, nombreUsuario)) {
                         continue;
                     }
+                } else if (!autenticado && cliente.autenticado) {
+                    if (!cliente.grupoActual.equals("Todos")) {
+                        continue;
+                    }
+                } else if (autenticado && !cliente.autenticado) {
+                    continue;
                 }
+                
                 cliente.enviarMensaje(prefijo + ": " + mensaje);
             }
         }
         esperandoMenu = false;
         opcionMenu = "";
+    }
+    
+    private void crearGrupo(String nombreGrupo) throws IOException {
+        if (nombreGrupo.isEmpty()) {
+            enviarMensaje("ERROR: Nombre de grupo vacio\n");
+            return;
+        }
+        
+        if (nombreGrupo.equalsIgnoreCase("Todos")) {
+            enviarMensaje("ERROR: No puedes usar ese nombre\n");
+            return;
+        }
+        
+        if (ServidorMulti.db.existeGrupo(nombreGrupo)) {
+            enviarMensaje("ERROR: El grupo ya existe\n");
+            return;
+        }
+        
+        if (ServidorMulti.db.crearGrupo(nombreGrupo, nombreUsuario)) {
+            enviarMensaje("OK: Grupo '" + nombreGrupo + "' creado\n");
+            System.out.println(nombreUsuario + " creo el grupo: " + nombreGrupo);
+        } else {
+            enviarMensaje("ERROR: No se pudo crear el grupo\n");
+        }
+    }
+    
+    private void unirseAGrupo(String nombreGrupo) throws IOException {
+        if (nombreGrupo.isEmpty()) {
+            enviarMensaje("ERROR: Nombre de grupo vacio\n");
+            return;
+        }
+        
+        if (!ServidorMulti.db.existeGrupo(nombreGrupo)) {
+            enviarMensaje("ERROR: El grupo no existe\n");
+            return;
+        }
+        
+        if (ServidorMulti.db.esMiembroDeGrupo(nombreGrupo, nombreUsuario)) {
+            enviarMensaje("ERROR: Ya eres miembro de este grupo\n");
+            return;
+        }
+        
+        if (ServidorMulti.db.unirseAGrupo(nombreGrupo, nombreUsuario)) {
+            enviarMensaje("OK: Te uniste al grupo '" + nombreGrupo + "'\n");
+            System.out.println(nombreUsuario + " se unio al grupo: " + nombreGrupo);
+        } else {
+            enviarMensaje("ERROR: No se pudo unir al grupo\n");
+        }
+    }
+    
+    private void salirDeGrupo(String nombreGrupo) throws IOException {
+        if (nombreGrupo.isEmpty()) {
+            enviarMensaje("ERROR: Nombre de grupo vacio\n");
+            return;
+        }
+        
+        if (nombreGrupo.equalsIgnoreCase("Todos")) {
+            enviarMensaje("ERROR: No puedes salir del grupo 'Todos'\n");
+            return;
+        }
+        
+        if (!ServidorMulti.db.esMiembroDeGrupo(nombreGrupo, nombreUsuario)) {
+            enviarMensaje("ERROR: No eres miembro de este grupo\n");
+            return;
+        }
+        
+        if (ServidorMulti.db.salirDeGrupo(nombreGrupo, nombreUsuario)) {
+            if (grupoActual.equals(nombreGrupo)) {
+                grupoActual = "Todos";
+                enviarMensaje("OK: Saliste del grupo '" + nombreGrupo + "'\nGrupo actual cambiado a 'Todos'\n");
+            } else {
+                enviarMensaje("OK: Saliste del grupo '" + nombreGrupo + "'\n");
+            }
+            System.out.println(nombreUsuario + " salio del grupo: " + nombreGrupo);
+        } else {
+            enviarMensaje("ERROR: No se pudo salir del grupo\n");
+        }
+    }
+    
+    private void borrarGrupo(String nombreGrupo) throws IOException {
+        if (nombreGrupo.isEmpty()) {
+            enviarMensaje("ERROR: Nombre de grupo vacio\n");
+            return;
+        }
+        
+        if (nombreGrupo.equalsIgnoreCase("Todos")) {
+            enviarMensaje("ERROR: No puedes borrar el grupo 'Todos'\n");
+            return;
+        }
+        
+        if (!ServidorMulti.db.existeGrupo(nombreGrupo)) {
+            enviarMensaje("ERROR: El grupo no existe\n");
+            return;
+        }
+        
+        if (ServidorMulti.db.borrarGrupo(nombreGrupo, nombreUsuario)) {
+            for (UnCliente cliente : ServidorMulti.clientes.values()) {
+                if (cliente.autenticado && cliente.grupoActual.equals(nombreGrupo)) {
+                    cliente.grupoActual = "Todos";
+                    cliente.enviarMensaje("\nAVISO: El grupo '" + nombreGrupo + "' fue eliminado\nGrupo actual cambiado a 'Todos'\n");
+                }
+            }
+            
+            enviarMensaje("OK: Grupo '" + nombreGrupo + "' eliminado\n");
+            System.out.println(nombreUsuario + " elimino el grupo: " + nombreGrupo);
+        } else {
+            enviarMensaje("ERROR: No se pudo borrar el grupo (solo el creador puede borrarlo)\n");
+        }
+    }
+    
+    private void cambiarGrupoActual(String nombreGrupo) throws IOException {
+        if (nombreGrupo.isEmpty()) {
+            enviarMensaje("ERROR: Nombre de grupo vacio\n");
+            return;
+        }
+        
+        if (!ServidorMulti.db.existeGrupo(nombreGrupo)) {
+            enviarMensaje("ERROR: El grupo no existe\n");
+            return;
+        }
+        
+        if (!ServidorMulti.db.esMiembroDeGrupo(nombreGrupo, nombreUsuario)) {
+            enviarMensaje("ERROR: No eres miembro de este grupo\n");
+            return;
+        }
+        
+        grupoActual = nombreGrupo;
+        enviarMensaje("OK: Grupo actual cambiado a '" + nombreGrupo + "'\n");
+        
+        List<String> mensajesNoLeidos = ServidorMulti.db.obtenerMensajesNoLeidosDeGrupo(nombreGrupo, nombreUsuario);
+        if (!mensajesNoLeidos.isEmpty()) {
+            enviarMensaje("\n=== MENSAJES NO LEIDOS ===\n");
+            for (String msg : mensajesNoLeidos) {
+                enviarMensaje(msg);
+            }
+            enviarMensaje("===========================\n");
+        }
+        
+        System.out.println(nombreUsuario + " cambio al grupo: " + nombreGrupo);
+    }
+    
+    private void mostrarGrupoActual() throws IOException {
+        enviarMensaje("Grupo actual: " + grupoActual + "\n");
+    }
+    
+    private void listarGrupos() throws IOException {
+        List<String> grupos = ServidorMulti.db.listarGrupos();
+        
+        if (grupos.isEmpty()) {
+            enviarMensaje("No hay grupos disponibles\n");
+            return;
+        }
+        
+        enviarMensaje("\n=== GRUPOS DISPONIBLES ===\n");
+        for (String grupo : grupos) {
+            String marca = "";
+            if (grupo.equals(grupoActual)) {
+                marca = " [ACTUAL]";
+            }
+            if (ServidorMulti.db.esMiembroDeGrupo(grupo, nombreUsuario)) {
+                marca += " [MIEMBRO]";
+            }
+            if (grupo.equalsIgnoreCase("Todos")) {
+                marca += " [SISTEMA]";
+            }
+            enviarMensaje("  - " + grupo + marca);
+        }
+        enviarMensaje("Total: " + grupos.size() + "\n");
+    }
+    
+    private void listarMisGrupos() throws IOException {
+        List<String> grupos = ServidorMulti.db.listarGruposDeUsuario(nombreUsuario);
+        
+        if (grupos.isEmpty()) {
+            enviarMensaje("No perteneces a ningun grupo\n");
+            return;
+        }
+        
+        enviarMensaje("\n=== MIS GRUPOS ===\n");
+        for (String grupo : grupos) {
+            String marca = "";
+            if (grupo.equals(grupoActual)) {
+                marca = " [ACTUAL]";
+            }
+            enviarMensaje("  - " + grupo + marca);
+        }
+        enviarMensaje("Total: " + grupos.size() + "\n");
+    }
+    
+    private void verMiembrosGrupo(String nombreGrupo) throws IOException {
+        if (nombreGrupo.isEmpty()) {
+            enviarMensaje("ERROR: Nombre de grupo vacio\n");
+            return;
+        }
+        
+        if (!ServidorMulti.db.existeGrupo(nombreGrupo)) {
+            enviarMensaje("ERROR: El grupo no existe\n");
+            return;
+        }
+        
+        List<String> miembros = ServidorMulti.db.listarMiembrosDeGrupo(nombreGrupo);
+        
+        if (miembros.isEmpty()) {
+            enviarMensaje("El grupo no tiene miembros\n");
+            return;
+        }
+        
+        enviarMensaje("\n=== MIEMBROS DE '" + nombreGrupo + "' ===\n");
+        for (String miembro : miembros) {
+            String estado = "";
+            if (miembro.equals(nombreUsuario)) {
+                estado = " [TU]";
+            }
+            
+            boolean conectado = buscarClientePorNombre(miembro) != null;
+            if (conectado) {
+                estado += " [ONLINE]";
+            }
+            
+            enviarMensaje("  - " + miembro + estado);
+        }
+        enviarMensaje("Total: " + miembros.size() + "\n");
     }
     
     private void invitarAJugarGato(String usuarioInvitado) throws IOException {
@@ -639,7 +1023,6 @@ public class UnCliente implements Runnable {
             return;
         }
         
-        // CAMBIO PRINCIPAL: Enviar todo el ranking en un solo mensaje
         StringBuilder sb = new StringBuilder();
         sb.append("\n=== RANKING GENERAL DEL GATO ===\n\n");
         for (String linea : ranking) {
@@ -792,7 +1175,7 @@ public class UnCliente implements Runnable {
         } else if (mensaje.equals("3")) {
             esperandoMenu = false;
             opcionMenu = "";
-            enviarMensaje("\n=== MODO INVITADO ===\nTienes 3 mensajes gratis\n");
+            enviarMensaje("\n=== MODO INVITADO ===\nTienes 3 mensajes gratis\nSolo puedes estar en el grupo 'Todos'\n");
         } else {
             enviarMensaje("ERROR: Escribe 1, 2 o 3\n");
             mostrarMenuAutenticacion();
@@ -804,7 +1187,6 @@ public class UnCliente implements Runnable {
             opcionMenu = "LOGIN_USUARIO";
             enviarMensaje("\n=== LOGIN ===\nUsuario: ");
         } else if (mensaje.equals("2")) {
-            // Ir a registro
             opcionMenu = "REGISTRO_USUARIO";
             enviarMensaje("\n=== REGISTRO ===\nUsuario: ");
         } else {
@@ -823,13 +1205,13 @@ public class UnCliente implements Runnable {
             return;
         }
         opcionMenu = "REGISTRO_PASSWORD";
-        enviarMensaje("Contraseña: ");
+        enviarMensaje("Contrasena: ");
     }
     
     private void procesarRegistroPassword(String mensaje) throws IOException {
         String password = mensaje.trim();
         if (password.isEmpty()) {
-            enviarMensaje("ERROR: No puede estar vacia\nContraseña: ");
+            enviarMensaje("ERROR: No puede estar vacia\nContrasena: ");
             return;
         }
         
@@ -838,7 +1220,9 @@ public class UnCliente implements Runnable {
             nombreUsuario = usuarioTemp;
             mensajesEnviados = 0;
             esperandoMenu = false;
+            grupoActual = "Todos";
             enviarMensaje("\nREGISTRO EXITOSO\nBienvenido " + nombreUsuario + "\n");
+            enviarMensaje("Grupo actual: Todos\n");
             mostrarMenuSiAutenticado();
             System.out.println("Nuevo usuario: " + nombreUsuario);
         } else {
@@ -851,7 +1235,7 @@ public class UnCliente implements Runnable {
     private void procesarLoginUsuario(String mensaje) throws IOException {
         usuarioTemp = mensaje.trim();
         opcionMenu = "LOGIN_PASSWORD";
-        enviarMensaje("Contraseña: ");
+        enviarMensaje("Contrasena: ");
     }
     
     private void procesarLoginPassword(String mensaje) throws IOException {
@@ -860,11 +1244,13 @@ public class UnCliente implements Runnable {
             nombreUsuario = usuarioTemp;
             mensajesEnviados = 0;
             esperandoMenu = false;
+            grupoActual = "Todos";
             enviarMensaje("\nINICIO DE SESION EXITOSO\nBienvenido " + nombreUsuario + "\n");
+            enviarMensaje("Grupo actual: Todos\n");
             mostrarMenuSiAutenticado();
             System.out.println(nombreUsuario + " inicio sesion");
         } else {
-            enviarMensaje("\nERROR: Usuario o contraseña incorrectos\n\n1. Reintentar\n2. Registrarse\n\nOpcion: ");
+            enviarMensaje("\nERROR: Usuario o contrasena incorrectos\n\n1. Reintentar\n2. Registrarse\n\nOpcion: ");
             opcionMenu = "LOGIN_REINTENTAR";
         }
         usuarioTemp = "";
@@ -895,6 +1281,17 @@ public class UnCliente implements Runnable {
                 RANKINGS:
                 10. Ver ranking general
                 11. Comparar jugadores
+                ---------------------
+                GRUPOS:
+                12. Ver todos los grupos
+                13. Crear grupo
+                14. Unirse a grupo
+                15. Salir de grupo
+                16. Borrar grupo
+                17. Cambiar grupo actual
+                18. Ver grupo actual
+                19. Ver mis grupos
+                20. Ver miembros de grupo
                 
                 Opcion: """);
         }
