@@ -74,6 +74,17 @@ public class ParaRecibir implements Runnable {
             RANKINGS:
             10. Ver ranking general
             11. Comparar jugadores
+            ------------------------------------
+            GRUPOS:
+            12. Ver todos los grupos
+            13. Crear grupo
+            14. Unirse a grupo
+            15. Salir de grupo
+            16. Borrar grupo
+            17. Cambiar grupo actual
+            18. Ver grupo actual
+            19. Ver mis grupos
+            20. Ver miembros de grupo
             ====================================
             """);
         System.out.print("Opcion: ");
