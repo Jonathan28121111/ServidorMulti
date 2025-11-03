@@ -98,7 +98,7 @@ public class DatabaseManager {
                 mensaje TEXT NOT NULL,
                 fecha_envio TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (grupo_id) REFERENCES grupos(id),
-                FOREIGN KEY (remitente) REFERENCES usuarios(username)
+                FOREIGN KEY (remitente) REFERENCIAS usuarios(username)
             )
         """;
         
@@ -155,6 +155,7 @@ public class DatabaseManager {
             
             inicializarEstadisticas(username);
             agregarUsuarioAGrupoTodos(username);
+            System.out.println("[DB] Usuario registrado: " + username);
             return true;
         } catch (SQLException e) {
             return false;
@@ -176,8 +177,10 @@ public class DatabaseManager {
         try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
             pstmt.setString(1, username);
             pstmt.executeUpdate();
+            System.out.println("[DB] Estadisticas inicializadas para: " + username);
         } catch (SQLException e) {
             System.err.println("Error al inicializar estadisticas: " + e.getMessage());
+            e.printStackTrace();
         }
     }
     
@@ -290,6 +293,14 @@ public class DatabaseManager {
     }
     
     public void registrarPartida(String jugador1, String jugador2, String ganador, boolean empate) {
+        System.out.println("\n========================================");
+        System.out.println("[DB] REGISTRANDO PARTIDA");
+        System.out.println("[DB] Jugador 1: " + jugador1);
+        System.out.println("[DB] Jugador 2: " + jugador2);
+        System.out.println("[DB] Ganador: " + ganador);
+        System.out.println("[DB] Empate: " + empate);
+        System.out.println("========================================");
+        
         String sqlHistorial = "INSERT INTO historial_partidas (jugador1, jugador2, ganador, empate) VALUES (?, ?, ?, ?)";
         try (PreparedStatement pstmt = connection.prepareStatement(sqlHistorial)) {
             pstmt.setString(1, jugador1);
@@ -297,21 +308,45 @@ public class DatabaseManager {
             pstmt.setString(3, ganador);
             pstmt.setInt(4, empate ? 1 : 0);
             pstmt.executeUpdate();
+            System.out.println("[DB] Partida guardada en historial");
         } catch (SQLException e) {
             System.err.println("Error al registrar partida en historial: " + e.getMessage());
+            e.printStackTrace();
         }
         
         if (empate) {
+            System.out.println("[DB] Actualizando empate para ambos jugadores");
             actualizarEstadisticas(jugador1, "empate");
             actualizarEstadisticas(jugador2, "empate");
         } else if (ganador != null) {
+            System.out.println("[DB] Actualizando victoria y derrota");
             actualizarEstadisticas(ganador, "victoria");
             String perdedor = ganador.equals(jugador1) ? jugador2 : jugador1;
             actualizarEstadisticas(perdedor, "derrota");
         }
+        
+        System.out.println("\n[DB] VERIFICACION POST-PARTIDA:");
+        verificarEstadisticas(jugador1);
+        verificarEstadisticas(jugador2);
+        System.out.println("========================================\n");
     }
     
     private void actualizarEstadisticas(String username, String resultado) {
+        System.out.println("[DB] Actualizando " + resultado + " para: " + username);
+        
+        String sqlVerificar = "SELECT COUNT(*) as existe FROM estadisticas_gato WHERE username = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(sqlVerificar)) {
+            pstmt.setString(1, username);
+            ResultSet rs = pstmt.executeQuery();
+            if (rs.next() && rs.getInt("existe") == 0) {
+                System.err.println("[DB] ERROR: No existen estadisticas para " + username);
+                System.err.println("[DB] Creando estadisticas para " + username);
+                inicializarEstadisticas(username);
+            }
+        } catch (SQLException e) {
+            System.err.println("Error al verificar estadisticas: " + e.getMessage());
+        }
+        
         String sql = "";
         switch (resultado) {
             case "victoria":
@@ -327,41 +362,80 @@ public class DatabaseManager {
         
         try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
             pstmt.setString(1, username);
-            pstmt.executeUpdate();
+            int rows = pstmt.executeUpdate();
+            System.out.println("[DB] Filas actualizadas: " + rows);
+            
+            if (rows == 0) {
+                System.err.println("[DB] ADVERTENCIA: No se actualizo ninguna fila para " + username);
+            } else {
+                System.out.println("[DB] Actualizado correctamente: " + username);
+            }
         } catch (SQLException e) {
             System.err.println("Error al actualizar estadisticas: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+    
+    private void verificarEstadisticas(String username) {
+        String sql = "SELECT * FROM estadisticas_gato WHERE username = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            pstmt.setString(1, username);
+            ResultSet rs = pstmt.executeQuery();
+            
+            if (rs.next()) {
+                System.out.println("[DB] Stats de " + username + ": " +
+                    "V=" + rs.getInt("victorias") + " " +
+                    "E=" + rs.getInt("empates") + " " +
+                    "D=" + rs.getInt("derrotas") + " " +
+                    "Pts=" + rs.getInt("puntos"));
+            } else {
+                System.err.println("[DB] ERROR: No existen estadisticas para " + username);
+            }
+        } catch (SQLException e) {
+            System.err.println("Error al verificar estadisticas: " + e.getMessage());
         }
     }
     
     public List<String> obtenerRankingGeneral() {
+        System.out.println("\n[DB] Obteniendo ranking general...");
         List<String> ranking = new ArrayList<>();
         String sql = """
-            SELECT username, victorias, empates, derrotas, puntos,
-                   (victorias + empates + derrotas) as total_partidas
+            SELECT username, victorias, empates, derrotas, puntos
             FROM estadisticas_gato
-            WHERE total_partidas > 0
             ORDER BY puntos DESC, victorias DESC, empates DESC
-            LIMIT 20
         """;
         
         try (Statement stmt = connection.createStatement();
              ResultSet rs = stmt.executeQuery(sql)) {
             int posicion = 1;
+            int totalEncontrados = 0;
             while (rs.next()) {
+                totalEncontrados++;
                 String username = rs.getString("username");
                 int victorias = rs.getInt("victorias");
                 int empates = rs.getInt("empates");
                 int derrotas = rs.getInt("derrotas");
                 int puntos = rs.getInt("puntos");
-                int totalPartidas = rs.getInt("total_partidas");
+                int totalPartidas = victorias + empates + derrotas;
                 
-                String linea = String.format("%d. %s - Puntos: %d | V:%d E:%d D:%d | Total: %d",
-                    posicion, username, puntos, victorias, empates, derrotas, totalPartidas);
-                ranking.add(linea);
-                posicion++;
+                System.out.println("[DB] Usuario encontrado: " + username + 
+                    " V:" + victorias + " E:" + empates + " D:" + derrotas + 
+                    " Pts:" + puntos + " Total:" + totalPartidas);
+                
+                if (totalPartidas > 0) {
+                    String linea = String.format("%d. %s - Puntos: %d | V:%d E:%d D:%d | Total: %d",
+                        posicion, username, puntos, victorias, empates, derrotas, totalPartidas);
+                    ranking.add(linea);
+                    posicion++;
+                    
+                    if (posicion > 20) break;
+                }
             }
+            System.out.println("[DB] Total usuarios encontrados en DB: " + totalEncontrados);
+            System.out.println("[DB] Total usuarios con partidas: " + (posicion - 1));
         } catch (SQLException e) {
             System.err.println("Error al obtener ranking: " + e.getMessage());
+            e.printStackTrace();
         }
         
         return ranking;
@@ -737,4 +811,4 @@ public class DatabaseManager {
             System.err.println("Error al cerrar conexion: " + e.getMessage());
         }
     }
-}       
+}
