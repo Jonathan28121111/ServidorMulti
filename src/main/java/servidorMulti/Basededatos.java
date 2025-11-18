@@ -4,11 +4,11 @@ import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 
-public class DatabaseManager {
+public class Basededatos {
     private static final String DB_URL = "jdbc:sqlite:chat.db";
     private Connection connection;
     
-    public DatabaseManager() {
+    public Basededatos() {
         try {
             Class.forName("org.sqlite.JDBC");
             connection = DriverManager.getConnection(DB_URL);
