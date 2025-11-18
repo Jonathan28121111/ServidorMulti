@@ -1,1 +1,9 @@
-ParaMandar.class
+clientemulti\ParaRecibir.class
+clientemulti\ClienteMulti.class
+servidormulti\DatabaseManager.class
+servidormulti\JuegoGato$ResultadoJuego.class
+servidormulti\GestorJuegos.class
+servidormulti\ServidorMulti.class
+servidormulti\JuegoGato.class
+servidormulti\UnCliente.class
+clientemulti\ParaMandar.class

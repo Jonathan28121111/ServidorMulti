@@ -1,0 +1,1487 @@
+-- ============================================================
+-- CREACION DE BASES DE DATOS DISTRIBUIDAS - SISTEMA VETERINARIA
+-- ============================================================
+-- Simulamos 2 sucursales de veterinaria en diferentes ubicaciones
+-- veterinaria_norte: Maneja informacion de clientes, mascotas y empleados
+-- veterinaria_sur: Maneja servicios, citas, inventario y finanzas
+-- ============================================================
+
+-- Eliminar bases de datos si existen (para empezar limpio)
+DROP DATABASE IF EXISTS veterinaria_norte;
+DROP DATABASE IF EXISTS veterinaria_sur;
+
+-- Crear base de datos de la Sucursal Norte
+CREATE DATABASE veterinaria_norte;
+
+-- Crear base de datos de la Sucursal Sur
+CREATE DATABASE veterinaria_sur;
+
+-- ============================================================
+-- BASE DE DATOS: VETERINARIA_NORTE (Sucursal Norte)
+-- Almacena: Clientes, Mascotas, Empleados, Proveedores
+-- ============================================================
+
+USE veterinaria_norte;
+
+-- Tabla: DUENOS (Propietarios de las mascotas)
+-- Almacena informacion completa de los clientes
+CREATE TABLE duenos (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    nombre VARCHAR(100) NOT NULL,
+    apellido VARCHAR(100) NOT NULL,
+    telefono VARCHAR(15),
+    telefono_emergencia VARCHAR(15),
+    direccion VARCHAR(200),
+    ciudad VARCHAR(50) DEFAULT 'Los Mochis',
+    estado VARCHAR(50) DEFAULT 'Sinaloa',
+    codigo_postal VARCHAR(10),
+    email VARCHAR(100) UNIQUE,
+    fecha_registro DATE DEFAULT (CURRENT_DATE),
+    tipo_cliente ENUM('regular', 'premium', 'vip') DEFAULT 'regular',
+    descuento_porcentaje DECIMAL(5,2) DEFAULT 0.00,
+    saldo_favor DECIMAL(10,2) DEFAULT 0.00,
+    observaciones TEXT,
+    activo BOOLEAN DEFAULT TRUE,
+    INDEX idx_nombre (nombre, apellido),
+    INDEX idx_email (email),
+    INDEX idx_tipo (tipo_cliente)
+);
+
+-- Tabla: MASCOTAS (Animales registrados)
+-- Contiene informacion detallada de cada mascota
+CREATE TABLE mascotas (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    nombre VARCHAR(50) NOT NULL,
+    especie ENUM('Perro', 'Gato', 'Ave', 'Conejo', 'Hamster', 'Reptil', 'Otro') NOT NULL,
+    raza VARCHAR(50),
+    sexo ENUM('Macho', 'Hembra') NOT NULL,
+    color VARCHAR(50),
+    fecha_nacimiento DATE,
+    edad INT,
+    peso DECIMAL(6,2),
+    altura DECIMAL(5,2),
+    microchip VARCHAR(20) UNIQUE,
+    esterilizado BOOLEAN DEFAULT FALSE,
+    alergias TEXT,
+    enfermedades_cronicas TEXT,
+    seguro_medico VARCHAR(100),
+    numero_poliza VARCHAR(50),
+    foto_url VARCHAR(255),
+    dueno_id INT NOT NULL,
+    fecha_registro DATETIME DEFAULT CURRENT_TIMESTAMP,
+    activo BOOLEAN DEFAULT TRUE,
+    FOREIGN KEY (dueno_id) REFERENCES duenos(id) ON DELETE CASCADE,
+    INDEX idx_dueno (dueno_id),
+    INDEX idx_especie (especie),
+    INDEX idx_microchip (microchip)
+);
+
+-- Tabla: EMPLEADOS (Personal de la veterinaria)
+-- Registra doctores, enfermeros, recepcionistas, etc.
+CREATE TABLE empleados (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    nombre VARCHAR(100) NOT NULL,
+    apellido VARCHAR(100) NOT NULL,
+    cedula_profesional VARCHAR(20) UNIQUE,
+    especialidad VARCHAR(100),
+    puesto ENUM('Veterinario', 'Enfermero', 'Recepcionista', 'Groomer', 'Administrador', 'Auxiliar') NOT NULL,
+    telefono VARCHAR(15),
+    email VARCHAR(100) UNIQUE,
+    fecha_contratacion DATE NOT NULL,
+    salario DECIMAL(10,2),
+    horario_entrada TIME,
+    horario_salida TIME,
+    dias_laborales VARCHAR(50),
+    activo BOOLEAN DEFAULT TRUE,
+    INDEX idx_puesto (puesto),
+    INDEX idx_cedula (cedula_profesional)
+);
+
+-- Tabla: PROVEEDORES (Empresas que suministran productos)
+-- Almacena informacion de proveedores de medicamentos, alimentos, etc.
+CREATE TABLE proveedores (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    nombre_empresa VARCHAR(150) NOT NULL,
+    contacto_nombre VARCHAR(100),
+    contacto_telefono VARCHAR(15),
+    contacto_email VARCHAR(100),
+    direccion VARCHAR(200),
+    ciudad VARCHAR(50),
+    rfc VARCHAR(13) UNIQUE,
+    tipo_productos VARCHAR(100),
+    dias_credito INT DEFAULT 0,
+    calificacion DECIMAL(3,2) DEFAULT 5.00,
+    activo BOOLEAN DEFAULT TRUE,
+    INDEX idx_nombre (nombre_empresa)
+);
+
+-- Tabla: RAZAS_COMUNES (Catalogo de razas por especie)
+-- Facilita la seleccion de razas al registrar mascotas
+CREATE TABLE razas_comunes (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    especie VARCHAR(30) NOT NULL,
+    raza VARCHAR(50) NOT NULL,
+    tamano ENUM('Toy', 'Pequeno', 'Mediano', 'Grande', 'Gigante') DEFAULT 'Mediano',
+    temperamento VARCHAR(100),
+    INDEX idx_especie (especie)
+);
+
+-- ============================================================
+-- BASE DE DATOS: VETERINARIA_SUR (Sucursal Sur)
+-- Almacena: Servicios, Citas, Historial Medico, Inventario, Finanzas
+-- ============================================================
+
+USE veterinaria_sur;
+
+-- Tabla: SERVICIOS (Catalogo de servicios ofrecidos)
+-- Lista todos los servicios disponibles con precios
+CREATE TABLE servicios (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    codigo VARCHAR(20) UNIQUE NOT NULL,
+    nombre VARCHAR(100) NOT NULL,
+    descripcion TEXT,
+    categoria ENUM('Consulta', 'Cirugia', 'Vacunacion', 'Estetica', 'Diagnostico', 'Emergencia', 'Hospitalizacion') NOT NULL,
+    precio DECIMAL(8,2) NOT NULL,
+    costo DECIMAL(8,2),
+    duracion_minutos INT DEFAULT 30,
+    requiere_cita BOOLEAN DEFAULT TRUE,
+    activo BOOLEAN DEFAULT TRUE,
+    INDEX idx_categoria (categoria),
+    INDEX idx_codigo (codigo)
+);
+
+-- Tabla: CITAS (Agendamiento de servicios)
+-- Registra todas las citas programadas y realizadas
+CREATE TABLE citas (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    folio VARCHAR(20) UNIQUE NOT NULL,
+    mascota_id INT NOT NULL,
+    dueno_id INT NOT NULL,
+    servicio_id INT NOT NULL,
+    empleado_id INT NOT NULL,
+    fecha_hora DATETIME NOT NULL,
+    fecha_registro DATETIME DEFAULT CURRENT_TIMESTAMP,
+    duracion_real INT,
+    motivo_consulta TEXT,
+    sintomas TEXT,
+    temperatura DECIMAL(4,2),
+    frecuencia_cardiaca INT,
+    frecuencia_respiratoria INT,
+    diagnostico TEXT,
+    tratamiento TEXT,
+    receta TEXT,
+    estado ENUM('pendiente', 'en_proceso', 'completada', 'cancelada', 'no_asistio') DEFAULT 'pendiente',
+    tipo_pago ENUM('efectivo', 'tarjeta', 'transferencia', 'seguro') DEFAULT 'efectivo',
+    monto_total DECIMAL(10,2),
+    monto_pagado DECIMAL(10,2) DEFAULT 0.00,
+    observaciones TEXT,
+    FOREIGN KEY (servicio_id) REFERENCES servicios(id),
+    INDEX idx_mascota (mascota_id),
+    INDEX idx_fecha (fecha_hora),
+    INDEX idx_estado (estado),
+    INDEX idx_folio (folio)
+);
+
+-- Tabla: HISTORIAL_MEDICO (Expediente clinico completo)
+-- Almacena todo el historial medico de cada mascota
+CREATE TABLE historial_medico (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    mascota_id INT NOT NULL,
+    cita_id INT,
+    fecha DATE NOT NULL,
+    tipo_registro ENUM('Consulta', 'Cirugia', 'Vacuna', 'Analisis', 'Accidente', 'Seguimiento') NOT NULL,
+    peso_registro DECIMAL(6,2),
+    tratamiento TEXT,
+    medicamentos TEXT,
+    dosis VARCHAR(100),
+    frecuencia VARCHAR(100),
+    duracion_tratamiento VARCHAR(50),
+    examenes_realizados TEXT,
+    resultados_examenes TEXT,
+    procedimientos TEXT,
+    complicaciones TEXT,
+    proximo_seguimiento DATE,
+    observaciones TEXT,
+    empleado_responsable INT,
+    archivo_adjunto VARCHAR(255),
+    FOREIGN KEY (cita_id) REFERENCES citas(id) ON DELETE SET NULL,
+    INDEX idx_mascota (mascota_id),
+    INDEX idx_fecha (fecha),
+    INDEX idx_tipo (tipo_registro)
+);
+
+-- Tabla: VACUNAS (Control de vacunacion)
+-- Registra todas las vacunas aplicadas
+CREATE TABLE vacunas (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    mascota_id INT NOT NULL,
+    nombre_vacuna VARCHAR(100) NOT NULL,
+    laboratorio VARCHAR(100),
+    lote VARCHAR(50),
+    fecha_aplicacion DATE NOT NULL,
+    fecha_vencimiento DATE,
+    proxima_dosis DATE,
+    empleado_aplica INT,
+    reaccion_adversa TEXT,
+    INDEX idx_mascota (mascota_id),
+    INDEX idx_proxima (proxima_dosis)
+);
+
+-- Tabla: INVENTARIO (Control de productos)
+-- Maneja el stock de medicamentos, alimentos, accesorios
+CREATE TABLE inventario (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    codigo VARCHAR(20) UNIQUE NOT NULL,
+    nombre VARCHAR(150) NOT NULL,
+    descripcion TEXT,
+    categoria ENUM('Medicamento', 'Alimento', 'Accesorio', 'Higiene', 'Instrumental', 'Consumible') NOT NULL,
+    marca VARCHAR(50),
+    presentacion VARCHAR(50),
+    unidad_medida VARCHAR(20),
+    stock_actual INT DEFAULT 0,
+    stock_minimo INT DEFAULT 10,
+    stock_maximo INT DEFAULT 100,
+    precio_compra DECIMAL(10,2),
+    precio_venta DECIMAL(10,2),
+    proveedor_id INT,
+    ubicacion_almacen VARCHAR(50),
+    fecha_caducidad DATE,
+    requiere_receta BOOLEAN DEFAULT FALSE,
+    activo BOOLEAN DEFAULT TRUE,
+    INDEX idx_codigo (codigo),
+    INDEX idx_categoria (categoria),
+    INDEX idx_stock (stock_actual)
+);
+
+-- Tabla: MOVIMIENTOS_INVENTARIO (Historial de movimientos)
+-- Registra entradas, salidas y ajustes de inventario
+CREATE TABLE movimientos_inventario (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    producto_id INT NOT NULL,
+    tipo_movimiento ENUM('entrada', 'salida', 'ajuste', 'devolucion', 'merma') NOT NULL,
+    cantidad INT NOT NULL,
+    motivo VARCHAR(100),
+    referencia VARCHAR(50),
+    fecha_movimiento DATETIME DEFAULT CURRENT_TIMESTAMP,
+    empleado_id INT,
+    costo_unitario DECIMAL(10,2),
+    observaciones TEXT,
+    FOREIGN KEY (producto_id) REFERENCES inventario(id) ON DELETE CASCADE,
+    INDEX idx_producto (producto_id),
+    INDEX idx_fecha (fecha_movimiento),
+    INDEX idx_tipo (tipo_movimiento)
+);
+
+-- Tabla: VENTAS (Registro de ventas de productos)
+-- Almacena todas las transacciones de venta
+CREATE TABLE ventas (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    folio VARCHAR(20) UNIQUE NOT NULL,
+    dueno_id INT NOT NULL,
+    fecha_venta DATETIME DEFAULT CURRENT_TIMESTAMP,
+    subtotal DECIMAL(10,2) NOT NULL,
+    descuento DECIMAL(10,2) DEFAULT 0.00,
+    iva DECIMAL(10,2),
+    total DECIMAL(10,2) NOT NULL,
+    metodo_pago ENUM('efectivo', 'tarjeta', 'transferencia', 'credito') NOT NULL,
+    estado ENUM('pagada', 'pendiente', 'cancelada') DEFAULT 'pagada',
+    empleado_vendedor INT,
+    observaciones TEXT,
+    INDEX idx_fecha (fecha_venta),
+    INDEX idx_dueno (dueno_id),
+    INDEX idx_folio (folio)
+);
+
+-- Tabla: DETALLE_VENTAS (Productos vendidos por transaccion)
+-- Detalla cada producto incluido en una venta
+CREATE TABLE detalle_ventas (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    venta_id INT NOT NULL,
+    producto_id INT NOT NULL,
+    cantidad INT NOT NULL,
+    precio_unitario DECIMAL(10,2) NOT NULL,
+    descuento DECIMAL(10,2) DEFAULT 0.00,
+    subtotal DECIMAL(10,2) NOT NULL,
+    FOREIGN KEY (venta_id) REFERENCES ventas(id) ON DELETE CASCADE,
+    FOREIGN KEY (producto_id) REFERENCES inventario(id),
+    INDEX idx_venta (venta_id),
+    INDEX idx_producto (producto_id)
+);
+
+-- Tabla: HOSPITALIZACION (Control de mascotas hospitalizadas)
+-- Registra mascotas que requieren internamiento
+CREATE TABLE hospitalizacion (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    mascota_id INT NOT NULL,
+    fecha_ingreso DATETIME NOT NULL,
+    fecha_salida DATETIME,
+    motivo TEXT NOT NULL,
+    jaula_numero VARCHAR(10),
+    estado ENUM('activa', 'alta', 'referido', 'fallecido') DEFAULT 'activa',
+    costo_diario DECIMAL(8,2),
+    empleado_responsable INT,
+    observaciones_ingreso TEXT,
+    observaciones_salida TEXT,
+    INDEX idx_mascota (mascota_id),
+    INDEX idx_estado (estado)
+);
+
+-- Tabla: NOTAS_HOSPITALIZACION (Bitacora de hospitalizacion)
+-- Registro diario del estado de mascotas hospitalizadas
+CREATE TABLE notas_hospitalizacion (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    hospitalizacion_id INT NOT NULL,
+    fecha_hora DATETIME DEFAULT CURRENT_TIMESTAMP,
+    temperatura DECIMAL(4,2),
+    frecuencia_cardiaca INT,
+    frecuencia_respiratoria INT,
+    alimento_consumido VARCHAR(100),
+    medicamentos_administrados TEXT,
+    comportamiento TEXT,
+    observaciones TEXT,
+    empleado_registro INT,
+    FOREIGN KEY (hospitalizacion_id) REFERENCES hospitalizacion(id) ON DELETE CASCADE,
+    INDEX idx_hospitalizacion (hospitalizacion_id),
+    INDEX idx_fecha (fecha_hora)
+);
+
+-- Tabla: GASTOS (Control de gastos operativos)
+-- Registra todos los gastos de la veterinaria
+CREATE TABLE gastos (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    fecha DATE NOT NULL,
+    categoria ENUM('Nomina', 'Servicios', 'Mantenimiento', 'Compras', 'Impuestos', 'Renta', 'Publicidad', 'Otros') NOT NULL,
+    concepto VARCHAR(150) NOT NULL,
+    monto DECIMAL(10,2) NOT NULL,
+    metodo_pago ENUM('efectivo', 'tarjeta', 'transferencia', 'cheque') NOT NULL,
+    proveedor_id INT,
+    factura VARCHAR(50),
+    comprobante_url VARCHAR(255),
+    empleado_autoriza INT,
+    observaciones TEXT,
+    INDEX idx_fecha (fecha),
+    INDEX idx_categoria (categoria)
+);
+
+-- ============================================================
+-- INSERCION MASIVA DE DATOS DE PRUEBA
+-- ============================================================
+
+-- DATOS PARA VETERINARIA_NORTE
+USE veterinaria_norte;
+
+-- Insertar 50 duenos (clientes)
+INSERT INTO duenos (nombre, apellido, telefono, telefono_emergencia, direccion, ciudad, codigo_postal, email, tipo_cliente, descuento_porcentaje, saldo_favor) VALUES
+('Carlos', 'Mendez', '6681234567', '6681234568', 'Av. Revolucion 123', 'Los Mochis', '81200', 'carlos.mendez@email.com', 'premium', 10.00, 500.00),
+('Ana', 'Rodriguez', '6689876543', '6689876544', 'Calle Flores 456', 'Los Mochis', '81210', 'ana.rodriguez@email.com', 'regular', 0.00, 0.00),
+('Luis', 'Sanchez', '6685551234', '6685551235', 'Blvd. Castro 789', 'Los Mochis', '81220', 'luis.sanchez@email.com', 'vip', 15.00, 1200.00),
+('Maria', 'Lopez', '6682223344', '6682223345', 'Calle Hidalgo 234', 'Ahome', '81230', 'maria.lopez@email.com', 'regular', 0.00, 0.00),
+('Jose', 'Garcia', '6683334455', '6683334456', 'Av. Insurgentes 567', 'Los Mochis', '81200', 'jose.garcia@email.com', 'premium', 10.00, 300.00),
+('Laura', 'Martinez', '6684445566', '6684445567', 'Calle Morelos 890', 'Los Mochis', '81210', 'laura.martinez@email.com', 'regular', 0.00, 0.00),
+('Pedro', 'Hernandez', '6685556677', '6685556678', 'Blvd. Macario Gaxiola 123', 'Ahome', '81220', 'pedro.hernandez@email.com', 'regular', 0.00, 0.00),
+('Sofia', 'Gonzalez', '6686667788', '6686667789', 'Av. Alvaro Obregon 456', 'Los Mochis', '81200', 'sofia.gonzalez@email.com', 'premium', 10.00, 600.00),
+('Diego', 'Ramirez', '6687778899', '6687778800', 'Calle Zaragoza 789', 'Los Mochis', '81210', 'diego.ramirez@email.com', 'vip', 15.00, 800.00),
+('Fernanda', 'Torres', '6688889900', '6688889901', 'Av. Juarez 234', 'Ahome', '81230', 'fernanda.torres@email.com', 'regular', 0.00, 0.00),
+('Roberto', 'Flores', '6681112233', '6681112234', 'Calle Constitucion 567', 'Los Mochis', '81200', 'roberto.flores@email.com', 'regular', 0.00, 0.00),
+('Gabriela', 'Cruz', '6682223355', '6682223356', 'Blvd. Centenario 890', 'Los Mochis', '81210', 'gabriela.cruz@email.com', 'premium', 10.00, 400.00),
+('Ricardo', 'Morales', '6683334466', '6683334467', 'Av. Tecnologico 123', 'Ahome', '81220', 'ricardo.morales@email.com', 'regular', 0.00, 0.00),
+('Valeria', 'Jimenez', '6684445577', '6684445578', 'Calle Independencia 456', 'Los Mochis', '81200', 'valeria.jimenez@email.com', 'regular', 0.00, 0.00),
+('Miguel', 'Ruiz', '6685556688', '6685556689', 'Av. Reforma 789', 'Los Mochis', '81210', 'miguel.ruiz@email.com', 'vip', 15.00, 1000.00),
+('Andrea', 'Diaz', '6686667799', '6686667700', 'Blvd. Gabriel Leyva 234', 'Ahome', '81230', 'andrea.diaz@email.com', 'premium', 10.00, 700.00),
+('Javier', 'Vazquez', '6687778811', '6687778812', 'Calle 5 de Mayo 567', 'Los Mochis', '81200', 'javier.vazquez@email.com', 'regular', 0.00, 0.00),
+('Daniela', 'Castillo', '6688889922', '6688889923', 'Av. Benito Juarez 890', 'Los Mochis', '81210', 'daniela.castillo@email.com', 'regular', 0.00, 0.00),
+('Alejandro', 'Ramos', '6681112244', '6681112245', 'Calle Madero 123', 'Ahome', '81220', 'alejandro.ramos@email.com', 'premium', 10.00, 550.00),
+('Camila', 'Ortiz', '6682223366', '6682223367', 'Blvd. Rosales 456', 'Los Mochis', '81200', 'camila.ortiz@email.com', 'regular', 0.00, 0.00),
+('Fernando', 'Medina', '6683334477', '6683334478', 'Av. Lazaro Cardenas 789', 'Los Mochis', '81210', 'fernando.medina@email.com', 'vip', 15.00, 900.00),
+('Isabella', 'Navarro', '6684445588', '6684445589', 'Calle Allende 234', 'Ahome', '81230', 'isabella.navarro@email.com', 'regular', 0.00, 0.00),
+('Eduardo', 'Aguilar', '6685556699', '6685556600', 'Av. Universidad 567', 'Los Mochis', '81200', 'eduardo.aguilar@email.com', 'premium', 10.00, 350.00),
+('Valentina', 'Guzman', '6686667711', '6686667712', 'Blvd. Miguel Hidalgo 890', 'Los Mochis', '81210', 'valentina.guzman@email.com', 'regular', 0.00, 0.00),
+('Rodrigo', 'Mendoza', '6687778822', '6687778823', 'Calle Guerrero 123', 'Ahome', '81220', 'rodrigo.mendoza@email.com', 'regular', 0.00, 0.00),
+('Mariana', 'Pena', '6688889933', '6688889934', 'Av. Obregon 456', 'Los Mochis', '81200', 'mariana.pena@email.com', 'vip', 15.00, 1100.00),
+('Santiago', 'Romero', '6681112255', '6681112256', 'Calle Bravo 789', 'Los Mochis', '81210', 'santiago.romero@email.com', 'premium', 10.00, 450.00),
+('Natalia', 'Vargas', '6682223377', '6682223378', 'Blvd. Jiquilpan 234', 'Ahome', '81230', 'natalia.vargas@email.com', 'regular', 0.00, 0.00),
+('Andres', 'Herrera', '6683334488', '6683334489', 'Av. Cuauhtemoc 567', 'Los Mochis', '81200', 'andres.herrera@email.com', 'regular', 0.00, 0.00),
+('Renata', 'Silva', '6684445599', '6684445500', 'Calle Victoria 890', 'Los Mochis', '81210', 'renata.silva@email.com', 'premium', 10.00, 650.00),
+('Leonardo', 'Rojas', '6685556711', '6685556712', 'Blvd. Antonio Rosales 123', 'Ahome', '81220', 'leonardo.rojas@email.com', 'regular', 0.00, 0.00),
+('Paula', 'Campos', '6686667722', '6686667723', 'Av. Nicolas Bravo 456', 'Los Mochis', '81200', 'paula.campos@email.com', 'vip', 15.00, 1300.00),
+('Emiliano', 'Reyes', '6687778833', '6687778834', 'Calle Morelos 789', 'Los Mochis', '81210', 'emiliano.reyes@email.com', 'regular', 0.00, 0.00),
+('Victoria', 'Cortez', '6688889944', '6688889945', 'Av. Independencia 234', 'Ahome', '81230', 'victoria.cortez@email.com', 'premium', 10.00, 500.00),
+('Mateo', 'Luna', '6681112266', '6681112267', 'Blvd. Solidaridad 567', 'Los Mochis', '81200', 'mateo.luna@email.com', 'regular', 0.00, 0.00),
+('Emma', 'Chavez', '6682223388', '6682223389', 'Calle Juarez 890', 'Los Mochis', '81210', 'emma.chavez@email.com', 'regular', 0.00, 0.00),
+('Sebastian', 'Soto', '6683334499', '6683334400', 'Av. Reforma 123', 'Ahome', '81220', 'sebastian.soto@email.com', 'vip', 15.00, 950.00),
+('Martina', 'Vega', '6684445511', '6684445512', 'Blvd. Ejercito Mexicano 456', 'Los Mochis', '81200', 'martina.vega@email.com', 'premium', 10.00, 750.00),
+('Nicolas', 'Dominguez', '6685556722', '6685556723', 'Calle Carranza 789', 'Los Mochis', '81210', 'nicolas.dominguez@email.com', 'regular', 0.00, 0.00),
+('Luciana', 'Guerrero', '6686667733', '6686667734', 'Av. Las Americas 234', 'Ahome', '81230', 'luciana.guerrero@email.com', 'regular', 0.00, 0.00),
+('Maximiliano', 'Santana', '6687778844', '6687778845', 'Blvd. Castro 567', 'Los Mochis', '81200', 'maximiliano.santana@email.com', 'premium', 10.00, 400.00),
+('Antonella', 'Marquez', '6688889955', '6688889956', 'Calle Ocampo 890', 'Los Mochis', '81210', 'antonella.marquez@email.com', 'vip', 15.00, 1050.00),
+('Benjamin', 'Espinoza', '6681112277', '6681112278', 'Av. Degollado 123', 'Ahome', '81220', 'benjamin.espinoza@email.com', 'regular', 0.00, 0.00),
+('Julieta', 'Salazar', '6682223399', '6682223300', 'Blvd. Vallarta 456', 'Los Mochis', '81200', 'julieta.salazar@email.com', 'regular', 0.00, 0.00),
+('Samuel', 'Carrillo', '6683334411', '6683334412', 'Calle Lerdo 789', 'Los Mochis', '81210', 'samuel.carrillo@email.com', 'premium', 10.00, 600.00),
+('Regina', 'Delgado', '6684445522', '6684445523', 'Av. Guadalupe Victoria 234', 'Ahome', '81230', 'regina.delgado@email.com', 'regular', 0.00, 0.00),
+('Angel', 'Lara', '6685556733', '6685556734', 'Blvd. Lopez Mateos 567', 'Los Mochis', '81200', 'angel.lara@email.com', 'vip', 15.00, 850.00),
+('Emilia', 'Valdez', '6686667744', '6686667745', 'Calle Porfirio Diaz 890', 'Los Mochis', '81210', 'emilia.valdez@email.com', 'premium', 10.00, 500.00),
+('Adrian', 'Pacheco', '6687778855', '6687778856', 'Av. Tecnologico 123', 'Ahome', '81220', 'adrian.pacheco@email.com', 'regular', 0.00, 0.00),
+('Ximena', 'Rios', '6688889966', '6688889967', 'Blvd. Manuel J. Clouthier 456', 'Los Mochis', '81200', 'ximena.rios@email.com', 'regular', 0.00, 0.00);
+
+-- Insertar 100 mascotas (2 por dueno en promedio)
+INSERT INTO mascotas (nombre, especie, raza, sexo, color, fecha_nacimiento, edad, peso, altura, microchip, esterilizado, alergias, enfermedades_cronicas, dueno_id) VALUES
+('Max', 'Perro', 'Labrador Retriever', 'Macho', 'Amarillo', '2021-03-15', 3, 28.50, 55.00, 'MX001234567890', TRUE, 'Ninguna', 'Ninguna', 1),
+('Luna', 'Gato', 'Siames', 'Hembra', 'Crema', '2022-06-20', 2, 4.20, 25.00, 'MX001234567891', TRUE, 'Polen', 'Ninguna', 1),
+('Rocky', 'Perro', 'Chihuahua', 'Macho', 'Cafe', '2019-01-10', 5, 3.80, 20.00, 'MX001234567892', TRUE, 'Ninguna', 'Problemas dentales', 2),
+('Michi', 'Gato', 'Persa', 'Hembra', 'Blanco', '2023-04-05', 1, 3.50, 23.00, 'MX001234567893', FALSE, 'Lactosa', 'Ninguna', 3),
+('Firulais', 'Perro', 'Mestizo', 'Macho', 'Negro', '2020-08-22', 4, 15.00, 45.00, 'MX001234567894', TRUE, 'Ninguna', 'Displasia de cadera', 3),
+('Pelusa', 'Gato', 'Angora', 'Hembra', 'Gris', '2022-11-12', 2, 4.80, 26.00, 'MX001234567895', TRUE, 'Ninguna', 'Ninguna', 4),
+('Bobby', 'Perro', 'Golden Retriever', 'Macho', 'Dorado', '2021-05-18', 3, 32.00, 58.00, 'MX001234567896', TRUE, 'Gluten', 'Ninguna', 4),
+('Coco', 'Ave', 'Loro', 'Macho', 'Verde', '2020-02-14', 4, 0.35, 30.00, NULL, FALSE, 'Ninguna', 'Ninguna', 5),
+('Nala', 'Perro', 'Husky Siberiano', 'Hembra', 'Gris y Blanco', '2022-09-30', 2, 22.00, 52.00, 'MX001234567897', TRUE, 'Ninguna', 'Ninguna', 5),
+('Simba', 'Gato', 'Maine Coon', 'Macho', 'Naranja', '2021-12-08', 3, 7.50, 28.00, 'MX001234567898', TRUE, 'Ninguna', 'Ninguna', 6),
+('Toby', 'Perro', 'Beagle', 'Macho', 'Tricolor', '2020-07-25', 4, 12.50, 38.00, 'MX001234567899', TRUE, 'Ninguna', 'Obesidad', 6),
+('Mia', 'Gato', 'Bengala', 'Hembra', 'Manchado', '2023-01-17', 1, 4.00, 24.00, 'MX001234567900', FALSE, 'Ninguna', 'Ninguna', 7),
+('Zeus', 'Perro', 'Pastor Aleman', 'Macho', 'Negro y Cafe', '2021-04-22', 3, 35.00, 62.00, 'MX001234567901', TRUE, 'Ninguna', 'Artritis leve', 7),
+('Kira', 'Perro', 'Doberman', 'Hembra', 'Negro', '2022-03-11', 2, 28.00, 60.00, 'MX001234567902', TRUE, 'Ninguna', 'Ninguna', 8),
+('Oliver', 'Gato', 'Britanico Pelo Corto', 'Macho', 'Azul', '2021-10-05', 3, 5.50, 27.00, 'MX001234567903', TRUE, 'Ninguna', 'Ninguna', 8),
+('Bella', 'Perro', 'Poodle', 'Hembra', 'Blanco', '2020-11-28', 4, 8.00, 35.00, 'MX001234567904', TRUE, 'Pollo', 'Ninguna', 9),
+('Chico', 'Conejo', 'Holandes', 'Macho', 'Blanco y Negro', '2023-02-14', 1, 2.20, 15.00, NULL, FALSE, 'Ninguna', 'Ninguna', 9),
+('Lola', 'Perro', 'Bulldog Frances', 'Hembra', 'Fawn', '2021-08-19', 3, 11.00, 30.00, 'MX001234567905', TRUE, 'Ninguna', 'Problemas respiratorios', 10),
+('Felix', 'Gato', 'Esfinge', 'Macho', 'Sin pelo', '2022-05-07', 2, 4.50, 25.00, 'MX001234567906', TRUE, 'Ninguna', 'Ninguna', 10),
+('Duke', 'Perro', 'Rottweiler', 'Macho', 'Negro', '2020-12-03', 4, 45.00, 65.00, 'MX001234567907', TRUE, 'Ninguna', 'Ninguna', 11),
+('Chloe', 'Gato', 'Ragdoll', 'Hembra', 'Seal Point', '2023-03-22', 1, 3.80, 24.00, 'MX001234567908', FALSE, 'Ninguna', 'Ninguna', 11),
+('Rex', 'Perro', 'Boxer', 'Macho', 'Atigrado', '2021-07-14', 3, 30.00, 57.00, 'MX001234567909', TRUE, 'Ninguna', 'Ninguna', 12),
+('Nina', 'Perro', 'Cocker Spaniel', 'Hembra', 'Dorado', '2022-10-30', 2, 13.00, 40.00, 'MX001234567910', TRUE, 'Ninguna', 'Otitis cronica', 12),
+('Milo', 'Gato', 'Scottish Fold', 'Macho', 'Gris', '2021-11-25', 3, 5.00, 26.00, 'MX001234567911', TRUE, 'Ninguna', 'Ninguna', 13),
+('Daisy', 'Perro', 'Shih Tzu', 'Hembra', 'Blanco y Cafe', '2020-09-17', 4, 6.50, 27.00, 'MX001234567912', TRUE, 'Ninguna', 'Ninguna', 13),
+('Rocco', 'Perro', 'Pitbull', 'Macho', 'Blanco', '2021-06-08', 3, 27.00, 53.00, 'MX001234567913', TRUE, 'Ninguna', 'Ninguna', 14),
+('Jazmin', 'Gato', 'Carey', 'Hembra', 'Tricolor', '2022-12-19', 2, 4.30, 24.00, 'MX001234567914', TRUE, 'Ninguna', 'Ninguna', 14),
+('Thor', 'Perro', 'Gran Danes', 'Macho', 'Arlequin', '2020-04-11', 4, 70.00, 80.00, 'MX001234567915', TRUE, 'Ninguna', 'Cardiomiopatia', 15),
+('Pantera', 'Gato', 'Bombay', 'Hembra', 'Negro', '2023-05-03', 1, 3.90, 23.00, 'MX001234567916', FALSE, 'Ninguna', 'Ninguna', 15),
+('Bruno', 'Perro', 'Dalmata', 'Macho', 'Blanco con Manchas', '2021-09-21', 3, 25.00, 55.00, 'MX001234567917', TRUE, 'Ninguna', 'Sordera parcial', 16),
+('Estrella', 'Perro', 'Schnauzer', 'Hembra', 'Sal y Pimienta', '2022-07-16', 2, 9.00, 35.00, 'MX001234567918', TRUE, 'Ninguna', 'Ninguna', 16),
+('Dante', 'Perro', 'Xoloitzcuintle', 'Macho', 'Negro', '2020-10-29', 4, 16.00, 50.00, 'MX001234567919', TRUE, 'Ninguna', 'Ninguna', 17),
+('Candy', 'Gato', 'Azul Ruso', 'Hembra', 'Azul', '2021-02-12', 3, 4.70, 25.00, 'MX001234567920', TRUE, 'Ninguna', 'Ninguna', 17),
+('Titan', 'Perro', 'Mastiff', 'Macho', 'Fawn', '2021-05-04', 3, 85.00, 75.00, 'MX001234567921', TRUE, 'Ninguna', 'Displasia de codo', 18),
+('Princesa', 'Gato', 'Himalayo', 'Hembra', 'Cream Point', '2022-08-27', 2, 4.60, 25.00, 'MX001234567922', TRUE, 'Ninguna', 'Ninguna', 18),
+('Apolo', 'Perro', 'Weimaraner', 'Macho', 'Gris', '2020-06-15', 4, 33.00, 60.00, 'MX001234567923', TRUE, 'Ninguna', 'Ninguna', 19),
+('Mulan', 'Gato', 'Turco Van', 'Hembra', 'Blanco', '2023-07-09', 1, 3.70, 24.00, 'MX001234567924', FALSE, 'Ninguna', 'Ninguna', 19),
+('Hector', 'Perro', 'Akita', 'Macho', 'Blanco', '2021-03-28', 3, 38.00, 65.00, 'MX001234567925', TRUE, 'Ninguna', 'Hipotiroidismo', 20),
+('Luna', 'Hamster', 'Sirio', 'Hembra', 'Dorado', '2024-01-20', 0, 0.15, 8.00, NULL, FALSE, 'Ninguna', 'Ninguna', 20),
+('Champ', 'Perro', 'Staffordshire', 'Macho', 'Atigrado', '2022-04-13', 2, 24.00, 48.00, 'MX001234567926', TRUE, 'Ninguna', 'Ninguna', 21),
+('Kitty', 'Gato', 'Manx', 'Hembra', 'Naranja', '2021-12-01', 3, 4.40, 24.00, 'MX001234567927', TRUE, 'Ninguna', 'Ninguna', 21),
+('Rambo', 'Perro', 'Bull Terrier', 'Macho', 'Blanco', '2020-08-06', 4, 26.00, 50.00, 'MX001234567928', TRUE, 'Ninguna', 'Ninguna', 22),
+('Minnie', 'Conejo', 'Belier', 'Hembra', 'Marron', '2023-09-14', 1, 1.80, 12.00, NULL, FALSE, 'Ninguna', 'Ninguna', 22),
+('Odin', 'Perro', 'San Bernardo', 'Macho', 'Tricolor', '2021-01-23', 3, 75.00, 70.00, 'MX001234567929', TRUE, 'Ninguna', 'Displasia de cadera', 23),
+('Ariel', 'Gato', 'Somalí', 'Hembra', 'Rojizo', '2022-11-05', 2, 4.90, 26.00, 'MX001234567930', TRUE, 'Ninguna', 'Ninguna', 23),
+('Atlas', 'Perro', 'Terranova', 'Macho', 'Negro', '2020-05-19', 4, 68.00, 72.00, 'MX001234567931', TRUE, 'Ninguna', 'Ninguna', 24),
+('Gata', 'Gato', 'Comun Europeo', 'Hembra', 'Atigrado', '2023-06-28', 1, 3.60, 23.00, 'MX001234567932', FALSE, 'Ninguna', 'Ninguna', 24),
+('Lobo', 'Perro', 'Alaskan Malamute', 'Macho', 'Gris y Blanco', '2021-10-12', 3, 40.00, 63.00, 'MX001234567933', TRUE, 'Ninguna', 'Ninguna', 25),
+('Sasha', 'Perro', 'Border Collie', 'Hembra', 'Negro y Blanco', '2022-02-25', 2, 18.00, 50.00, 'MX001234567934', TRUE, 'Ninguna', 'Ninguna', 25),
+('King', 'Perro', 'Cane Corso', 'Macho', 'Negro', '2020-11-08', 4, 50.00, 68.00, 'MX001234567935', TRUE, 'Ninguna', 'Ninguna', 26),
+('Perla', 'Gato', 'Sagrado de Birmania', 'Hembra', 'Seal Point', '2021-07-21', 3, 5.20, 27.00, 'MX001234567936', TRUE, 'Ninguna', 'Ninguna', 26),
+('Draco', 'Reptil', 'Iguana', 'Macho', 'Verde', '2022-03-15', 2, 3.50, 60.00, NULL, FALSE, 'Ninguna', 'Ninguna', 27),
+('Pelusa', 'Perro', 'Pomerania', 'Hembra', 'Naranja', '2023-08-10', 1, 3.20, 22.00, 'MX001234567937', FALSE, 'Ninguna', 'Ninguna', 27),
+('Hades', 'Perro', 'Dogo Argentino', 'Macho', 'Blanco', '2021-04-07', 3, 42.00, 65.00, 'MX001234567938', TRUE, 'Ninguna', 'Sordera', 28),
+('Amelia', 'Gato', 'Tonquines', 'Hembra', 'Chocolate', '2022-09-19', 2, 4.10, 24.00, 'MX001234567939', TRUE, 'Ninguna', 'Ninguna', 28),
+('Chucky', 'Perro', 'Jack Russell', 'Macho', 'Blanco y Cafe', '2020-12-14', 4, 7.50, 32.00, 'MX001234567940', TRUE, 'Ninguna', 'Hiperactividad', 29),
+('Mimi', 'Gato', 'Abisinio', 'Hembra', 'Rojizo', '2023-04-26', 1, 3.80, 23.00, 'MX001234567941', FALSE, 'Ninguna', 'Ninguna', 29),
+('Sultan', 'Perro', 'Saluki', 'Macho', 'Crema', '2021-08-03', 3, 25.00, 58.00, 'MX001234567942', TRUE, 'Ninguna', 'Ninguna', 30),
+('Cleo', 'Gato', 'Ocicat', 'Hembra', 'Manchado', '2022-01-18', 2, 4.50, 25.00, 'MX001234567943', TRUE, 'Ninguna', 'Ninguna', 30),
+('Kaiser', 'Perro', 'Leonberger', 'Macho', 'Leonado', '2020-07-29', 4, 72.00, 75.00, 'MX001234567944', TRUE, 'Ninguna', 'Displasia de cadera', 31),
+('Zoe', 'Perro', 'Bichon Frise', 'Hembra', 'Blanco', '2023-10-11', 1, 5.50, 28.00, 'MX001234567945', FALSE, 'Ninguna', 'Ninguna', 31),
+('Samson', 'Perro', 'Rhodesian Ridgeback', 'Macho', 'Trigo', '2021-02-16', 3, 38.00, 64.00, 'MX001234567946', TRUE, 'Ninguna', 'Ninguna', 32),
+('Misty', 'Gato', 'Burmilla', 'Hembra', 'Plateado', '2022-06-23', 2, 4.20, 24.00, 'MX001234567947', TRUE, 'Ninguna', 'Ninguna', 32),
+('Brutus', 'Perro', 'Presa Canario', 'Macho', 'Atigrado', '2020-09-05', 4, 55.00, 66.00, 'MX001234567948', TRUE, 'Ninguna', 'Ninguna', 33),
+('Nieve', 'Gato', 'Angora Turco', 'Hembra', 'Blanco', '2023-11-17', 1, 3.50, 23.00, 'MX001234567949', FALSE, 'Ninguna', 'Ninguna', 33),
+('Fenrir', 'Perro', 'Wolfhound Irlandes', 'Macho', 'Gris', '2021-05-22', 3, 60.00, 80.00, 'MX001234567950', TRUE, 'Ninguna', 'Cardiomiopatia', 34),
+('Diva', 'Perro', 'Papillon', 'Hembra', 'Blanco y Marron', '2022-10-08', 2, 4.00, 25.00, 'MX001234567951', TRUE, 'Ninguna', 'Ninguna', 34),
+('Hercules', 'Perro', 'Fila Brasileiro', 'Macho', 'Fawn', '2020-03-27', 4, 52.00, 68.00, 'MX001234567952', TRUE, 'Ninguna', 'Ninguna', 35),
+('Dulce', 'Gato', 'Burmés', 'Hembra', 'Chocolate', '2021-09-14', 3, 4.60, 25.00, 'MX001234567953', TRUE, 'Ninguna', 'Ninguna', 35),
+('Sombra', 'Perro', 'Schipperke', 'Macho', 'Negro', '2023-01-06', 1, 6.00, 30.00, 'MX001234567954', FALSE, 'Ninguna', 'Ninguna', 36),
+('Luz', 'Ave', 'Cacatua', 'Hembra', 'Blanco', '2021-12-20', 3, 0.40, 35.00, NULL, FALSE, 'Ninguna', 'Ninguna', 36),
+('Spartan', 'Perro', 'Boerboel', 'Macho', 'Fawn', '2020-06-11', 4, 70.00, 70.00, 'MX001234567955', TRUE, 'Ninguna', 'Ninguna', 37),
+('Princesa', 'Perro', 'Maltés', 'Hembra', 'Blanco', '2022-04-29', 2, 3.50, 23.00, 'MX001234567956', TRUE, 'Ninguna', 'Ninguna', 37),
+('Viking', 'Perro', 'Elkhound Noruego', 'Macho', 'Gris', '2021-11-02', 3, 23.00, 52.00, 'MX001234567957', TRUE, 'Ninguna', 'Ninguna', 38),
+('Ginger', 'Gato', 'Devon Rex', 'Hembra', 'Naranja', '2023-07-18', 1, 3.40, 22.00, 'MX001234567958', FALSE, 'Ninguna', 'Ninguna', 38),
+('Conan', 'Perro', 'Tosa Inu', 'Macho', 'Rojizo', '2020-08-24', 4, 60.00, 70.00, 'MX001234567959', TRUE, 'Ninguna', 'Displasia de cadera', 39),
+('Rosita', 'Conejo', 'Rex', 'Hembra', 'Blanco', '2024-02-10', 0, 1.50, 13.00, NULL, FALSE, 'Ninguna', 'Ninguna', 39),
+('Ragnar', 'Perro', 'Braco Alemán', 'Macho', 'Marron y Blanco', '2021-06-17', 3, 29.00, 60.00, 'MX001234567960', TRUE, 'Ninguna', 'Ninguna', 40),
+('Lily', 'Gato', 'Cornish Rex', 'Hembra', 'Blanco', '2022-12-05', 2, 3.90, 23.00, 'MX001234567961', TRUE, 'Ninguna', 'Ninguna', 40),
+('Caesar', 'Perro', 'American Bully', 'Macho', 'Azul', '2020-10-19', 4, 35.00, 50.00, 'MX001234567962', TRUE, 'Ninguna', 'Ninguna', 41),
+('Shakira', 'Ave', 'Canario', 'Hembra', 'Amarillo', '2023-05-22', 1, 0.02, 15.00, NULL, FALSE, 'Ninguna', 'Ninguna', 41),
+('Maximus', 'Perro', 'Bobtail', 'Macho', 'Gris y Blanco', '2021-03-09', 3, 32.00, 56.00, 'MX001234567963', TRUE, 'Ninguna', 'Ninguna', 42),
+('Chispita', 'Hamster', 'Roborovski', 'Hembra', 'Arena', '2024-03-15', 0, 0.03, 5.00, NULL, FALSE, 'Ninguna', 'Ninguna', 42),
+('Hulk', 'Perro', 'American Stanford', 'Macho', 'Azul', '2020-12-28', 4, 30.00, 48.00, 'MX001234567964', TRUE, 'Ninguna', 'Ninguna', 43),
+('Copito', 'Conejo', 'Angora', 'Macho', 'Blanco', '2023-08-04', 1, 2.50, 16.00, NULL, FALSE, 'Ninguna', 'Ninguna', 43),
+('Storm', 'Perro', 'Australian Cattle Dog', 'Macho', 'Azul Moteado', '2021-07-26', 3, 20.00, 48.00, 'MX001234567965', TRUE, 'Ninguna', 'Ninguna', 44),
+('Negrita', 'Gato', 'Oriental', 'Hembra', 'Negro', '2022-02-14', 2, 4.00, 24.00, 'MX001234567966', TRUE, 'Ninguna', 'Ninguna', 44),
+('Samurai', 'Perro', 'Shiba Inu', 'Macho', 'Sesamo', '2020-05-08', 4, 10.00, 39.00, 'MX001234567967', TRUE, 'Ninguna', 'Ninguna', 45),
+('Nala', 'Gato', 'Korat', 'Hembra', 'Azul', '2023-09-30', 1, 3.70, 23.00, 'MX001234567968', FALSE, 'Ninguna', 'Ninguna', 45),
+('Buddy', 'Perro', 'Boyero de Berna', 'Macho', 'Tricolor', '2021-04-15', 3, 48.00, 66.00, 'MX001234567969', TRUE, 'Ninguna', 'Displasia de cadera', 46),
+('Moka', 'Gato', 'York Chocolate', 'Hembra', 'Chocolate', '2022-08-21', 2, 4.80, 26.00, 'MX001234567970', TRUE, 'Ninguna', 'Ninguna', 46),
+('Tyson', 'Perro', 'Alapaha', 'Macho', 'Blanco y Marron', '2020-11-03', 4, 40.00, 60.00, 'MX001234567971', TRUE, 'Ninguna', 'Ninguna', 47),
+('Bombón', 'Conejo', 'Mini Lop', 'Hembra', 'Caramelo', '2024-01-28', 0, 1.20, 11.00, NULL, FALSE, 'Ninguna', 'Ninguna', 47),
+('Zeus', 'Perro', 'Kangal', 'Macho', 'Leonado', '2021-09-11', 3, 65.00, 75.00, 'MX001234567972', TRUE, 'Ninguna', 'Ninguna', 48),
+('Clarita', 'Ave', 'Periquito', 'Hembra', 'Azul', '2023-12-06', 1, 0.03, 18.00, NULL, FALSE, 'Ninguna', 'Ninguna', 48),
+('Apollo', 'Perro', 'Vizsla', 'Macho', 'Dorado', '2020-07-18', 4, 27.00, 58.00, 'MX001234567973', TRUE, 'Ninguna', 'Ninguna', 49),
+('Lunita', 'Hamster', 'Campbell', 'Hembra', 'Gris', '2024-04-12', 0, 0.04, 7.00, NULL, FALSE, 'Ninguna', 'Ninguna', 49),
+('Ranger', 'Perro', 'Airedale Terrier', 'Macho', 'Negro y Fuego', '2021-02-23', 3, 23.00, 58.00, 'MX001234567974', TRUE, 'Ninguna', 'Ninguna', 50),
+('Dulcinea', 'Gato', 'LaPerm', 'Hembra', 'Carey', '2022-06-09', 2, 3.80, 24.00, 'MX001234567975', TRUE, 'Ninguna', 'Ninguna', 50);
+
+-- Insertar 15 empleados
+INSERT INTO empleados (nombre, apellido, cedula_profesional, especialidad, puesto, telefono, email, fecha_contratacion, salario, horario_entrada, horario_salida, dias_laborales) VALUES
+('Roberto', 'Martinez', 'MED123456', 'Medicina General', 'Veterinario', '6681112222', 'roberto.martinez@vet.com', '2020-01-15', 18000.00, '08:00:00', '16:00:00', 'Lunes a Viernes'),
+('Patricia', 'Lopez', 'MED234567', 'Cirugia', 'Veterinario', '6682223333', 'patricia.lopez@vet.com', '2019-06-20', 22000.00, '09:00:00', '17:00:00', 'Lunes a Viernes'),
+('Jorge', 'Ramirez', 'MED345678', 'Dermatologia', 'Veterinario', '6683334444', 'jorge.ramirez@vet.com', '2021-03-10', 19000.00, '08:00:00', '16:00:00', 'Lunes a Sabado'),
+('Carmen', 'Fernandez', 'ENF456789', 'Enfermeria Veterinaria', 'Enfermero', '6684445555', 'carmen.fernandez@vet.com', '2020-09-05', 12000.00, '07:00:00', '15:00:00', 'Lunes a Viernes'),
+('Alberto', 'Gomez', 'ENF567890', 'Cuidados Intensivos', 'Enfermero', '6685556666', 'alberto.gomez@vet.com', '2021-11-12', 13000.00, '15:00:00', '23:00:00', 'Lunes a Sabado'),
+('Monica', 'Herrera', NULL, NULL, 'Recepcionista', '6686667777', 'monica.herrera@vet.com', '2022-02-18', 10000.00, '08:00:00', '16:00:00', 'Lunes a Viernes'),
+('Sandra', 'Torres', NULL, NULL, 'Recepcionista', '6687778888', 'sandra.torres@vet.com', '2022-05-22', 10000.00, '15:00:00', '23:00:00', 'Lunes a Domingo'),
+('Miguel', 'Castillo', NULL, 'Estetica Canina', 'Groomer', '6688889999', 'miguel.castillo@vet.com', '2021-08-30', 11000.00, '10:00:00', '18:00:00', 'Martes a Sabado'),
+('Lucia', 'Moreno', NULL, 'Grooming Felino', 'Groomer', '6681113333', 'lucia.moreno@vet.com', '2022-01-14', 11000.00, '10:00:00', '18:00:00', 'Martes a Sabado'),
+('Francisco', 'Ruiz', 'ADM678901', 'Administracion', 'Administrador', '6682224444', 'francisco.ruiz@vet.com', '2019-03-01', 20000.00, '08:00:00', '17:00:00', 'Lunes a Viernes'),
+('Diana', 'Vazquez', 'MED789012', 'Oncologia', 'Veterinario', '6683335555', 'diana.vazquez@vet.com', '2020-07-25', 21000.00, '09:00:00', '17:00:00', 'Lunes a Viernes'),
+('Oscar', 'Mendoza', 'ENF890123', 'Anestesiologia', 'Enfermero', '6684446666', 'oscar.mendoza@vet.com', '2021-04-19', 13500.00, '08:00:00', '16:00:00', 'Lunes a Viernes'),
+('Isabel', 'Jimenez', NULL, NULL, 'Auxiliar', '6685557777', 'isabel.jimenez@vet.com', '2022-09-08', 9000.00, '08:00:00', '16:00:00', 'Lunes a Sabado'),
+('Ramon', 'Silva', NULL, 'Limpieza y Mantenimiento', 'Auxiliar', '6686668888', 'ramon.silva@vet.com', '2021-12-03', 9000.00, '06:00:00', '14:00:00', 'Lunes a Sabado'),
+('Elena', 'Ortiz', 'MED901234', 'Cardiologia', 'Veterinario', '6687779999', 'elena.ortiz@vet.com', '2020-11-16', 20000.00, '08:00:00', '16:00:00', 'Lunes a Viernes');
+
+-- Insertar 20 proveedores
+INSERT INTO proveedores (nombre_empresa, contacto_nombre, contacto_telefono, contacto_email, direccion, ciudad, rfc, tipo_productos, dias_credito, calificacion) VALUES
+('Farmaceutica Veterinaria del Pacifico', 'Juan Herrera', '6681234567', 'ventas@farmvet.com', 'Av. Industrial 100', 'Culiacan', 'FVP890123ABC', 'Medicamentos', 30, 4.80),
+('Distribuidora de Alimentos ProPet', 'Maria Sanchez', '6689876543', 'contacto@propet.com', 'Calle Comercio 200', 'Mazatlan', 'DAP901234DEF', 'Alimentos', 15, 4.50),
+('Instrumental Medico Veterinario', 'Pedro Castro', '6685551111', 'ventas@imvet.com', 'Blvd. Tecnologico 300', 'Los Mochis', 'IMV012345GHI', 'Instrumental', 45, 4.90),
+('Accesorios y Juguetes Mascotas SA', 'Ana Ruiz', '6682223344', 'info@accesorios.com', 'Av. Central 400', 'Culiacan', 'AJM123456JKL', 'Accesorios', 20, 4.20),
+('Laboratorio Bayer Veterinaria', 'Luis Mendez', '6683334455', 'bayer@vet.com', 'Parque Industrial 500', 'Guadalajara', 'LBV234567MNO', 'Medicamentos', 60, 5.00),
+('Purina Distribucion Regional', 'Carmen Lopez', '6684445566', 'ventas@purina.com', 'Av. Americas 600', 'Culiacan', 'PDR345678PQR', 'Alimentos', 30, 4.70),
+('Zoetis Mexico', 'Roberto Torres', '6685556677', 'mexico@zoetis.com', 'Zona Industrial 700', 'Monterrey', 'ZMX456789STU', 'Medicamentos', 45, 4.95),
+('Higiene y Limpieza Veterinaria', 'Sofia Flores', '6686667788', 'contacto@higienevert.com', 'Calle Libertad 800', 'Los Mochis', 'HLV567890VWX', 'Higiene', 15, 4.30),
+('Royal Canin Sinaloa', 'Diego Ramirez', 'Contact 6687778899', 'sinaloa@royalcanin.com', 'Av. Ejercito 900', 'Culiacan', 'RCS678901YZA', 'Alimentos', 30, 4.80),
+('Instrumental Quirurgico Veterinario', 'Laura Garcia', '6688889900', 'ventas@iqvet.com', 'Blvd. Industrial 1000', 'Guadalajara', 'IQV789012BCD', 'Instrumental', 60, 4.60),
+('MSD Salud Animal', 'Miguel Hernandez', '6681112244', 'contacto@msd.com', 'Parque Empresarial 1100', 'Mexico DF', 'MSA890123EFG', 'Medicamentos', 45, 4.85),
+('Hill's Pet Nutrition', 'Gabriela Martinez', '6682223355', 'hills@nutrition.com', 'Av. Tecnologico 1200', 'Monterrey', 'HPN901234HIJ', 'Alimentos', 30, 4.75),
+('Suministros Veterinarios del Norte', 'Ricardo Gomez', '6683334466', 'norte@suministros.com', 'Calle Industrial 1300', 'Los Mochis', 'SVN012345KLM', 'Consumibles', 20, 4.40),
+('Boehringer Ingelheim', 'Valeria Diaz', '6684445577', 'mexico@boehringer.com', 'Zona Corporativa 1400', 'Mexico DF', 'BIN123456NOP', 'Medicamentos', 60, 4.90),
+('Pedigree Distribucion', 'Andres Vazquez', '6685556688', 'ventas@pedigree.com', 'Av. Logistica 1500', 'Guadalajara', 'PDI234567QRS', 'Alimentos', 25, 4.55),
+('Estetica y Grooming Supplies', 'Camila Ruiz', '6686667799', 'grooming@supplies.com', 'Calle Comercial 1600', 'Los Mochis', 'EGS345678TUV', 'Higiene', 15, 4.25),
+('Virbac Mexico', 'Fernando Morales', '6687778811', 'contacto@virbac.mx', 'Parque Industrial 1700', 'Queretaro', 'VMX456789WXY', 'Medicamentos', 45, 4.80),
+('Equipamiento Veterinario Integral', 'Isabella Jimenez', '6688889922', 'ventas@evivet.com', 'Blvd. Empresarial 1800', 'Monterrey', 'EVI567890ZAB', 'Instrumental', 30, 4.65),
+('Alimentos Premium Mascotas', 'Leonardo Aguilar', '6681112255', 'premium@alimentos.com', 'Av. Central 1900', 'Culiacan', 'APM678901CDE', 'Alimentos', 20, 4.50),
+('Biotecnologia Veterinaria Avanzada', 'Martina Guzman', '6682223366', 'biotech@veterinaria.com', 'Zona Cientifica 2000', 'Mexico DF', 'BVA789012FGH', 'Medicamentos', 60, 4.95);
+
+-- Insertar catalogo de razas comunes
+INSERT INTO razas_comunes (especie, raza, tamano, temperamento) VALUES
+('Perro', 'Labrador Retriever', 'Grande', 'Amigable y activo'),
+('Perro', 'Chihuahua', 'Toy', 'Alerta y valiente'),
+('Perro', 'Golden Retriever', 'Grande', 'Cariñoso e inteligente'),
+('Perro', 'Bulldog Frances', 'Pequeno', 'Jugueton y adaptable'),
+('Perro', 'Pastor Aleman', 'Grande', 'Leal y protector'),
+('Perro', 'Beagle', 'Mediano', 'Curioso y amigable'),
+('Perro', 'Poodle', 'Mediano', 'Inteligente y elegante'),
+('Perro', 'Yorkshire Terrier', 'Toy', 'Audaz y cariñoso'),
+('Perro', 'Boxer', 'Grande', 'Energetico y protector'),
+('Perro', 'Dachshund', 'Pequeno', 'Valiente y curioso'),
+('Gato', 'Siames', 'Mediano', 'Vocal y social'),
+('Gato', 'Persa', 'Mediano', 'Tranquilo y afectuoso'),
+('Gato', 'Maine Coon', 'Grande', 'Gentil y sociable'),
+('Gato', 'Bengala', 'Mediano', 'Activo y jugueton'),
+('Gato', 'Ragdoll', 'Grande', 'Docil y relajado'),
+('Gato', 'Britanico Pelo Corto', 'Mediano', 'Independiente y calmado'),
+('Gato', 'Scottish Fold', 'Mediano', 'Dulce y adaptable'),
+('Gato', 'Sphynx', 'Mediano', 'Energetico y afectuoso'),
+('Gato', 'Abisinio', 'Mediano', 'Activo e inteligente'),
+('Gato', 'Bombay', 'Mediano', 'Amigable y jugueton');
+
+-- DATOS PARA VETERINARIA_SUR
+USE veterinaria_sur;
+
+-- Insertar 30 servicios
+INSERT INTO servicios (codigo, nombre, descripcion, categoria, precio, costo, duracion_minutos, requiere_cita) VALUES
+('CONS001', 'Consulta General', 'Revision medica completa del estado de salud', 'Consulta', 350.00, 100.00, 30, TRUE),
+('CONS002', 'Consulta Especializada Dermatologia', 'Atencion especializada en problemas de piel', 'Consulta', 500.00, 150.00, 45, TRUE),
+('CONS003', 'Consulta Cardiologia', 'Evaluacion del sistema cardiovascular', 'Consulta', 600.00, 180.00, 45, TRUE),
+('VAC001', 'Vacuna Multiple Canina', 'Proteccion contra moquillo, parvovirus y hepatitis', 'Vacunacion', 300.00, 120.00, 15, TRUE),
+('VAC002', 'Vacuna Antirrabica', 'Inmunizacion contra rabia', 'Vacunacion', 200.00, 80.00, 10, TRUE),
+('VAC003', 'Vacuna Triple Felina', 'Proteccion contra panleucopenia, rinotraqueitis y calicivirus', 'Vacunacion', 320.00, 130.00, 15, TRUE),
+('VAC004', 'Vacuna Leucemia Felina', 'Proteccion contra leucemia en gatos', 'Vacunacion', 350.00, 140.00, 15, TRUE),
+('CIR001', 'Esterilizacion Canino Macho', 'Castracion quirurgica', 'Cirugia', 1800.00, 500.00, 90, TRUE),
+('CIR002', 'Esterilizacion Canino Hembra', 'Ovariohisterectomia', 'Cirugia', 2200.00, 650.00, 120, TRUE),
+('CIR003', 'Esterilizacion Felino Macho', 'Castracion quirurgica', 'Cirugia', 1200.00, 350.00, 60, TRUE),
+('CIR004', 'Esterilizacion Felino Hembra', 'Ovariohisterectomia', 'Cirugia', 1500.00, 450.00, 90, TRUE),
+('CIR005', 'Cirugia Extraccion Dental', 'Remocion de piezas dentales danadas', 'Cirugia', 1500.00, 400.00, 60, TRUE),
+('CIR006', 'Cirugia Tumor Piel', 'Extirpacion de masa tumoral cutanea', 'Cirugia', 3500.00, 1000.00, 120, TRUE),
+('EST001', 'Bano Medicado', 'Limpieza con shampoo especializado', 'Estetica', 300.00, 80.00, 45, TRUE),
+('EST002', 'Corte de Pelo Completo', 'Estetica canina o felina', 'Estetica', 400.00, 100.00, 60, TRUE),
+('EST003', 'Corte de Unas', 'Recorte de unas y limado', 'Estetica', 100.00, 20.00, 15, FALSE),
+('EST004', 'Limpieza de Oidos', 'Higiene auricular profunda', 'Estetica', 150.00, 30.00, 20, FALSE),
+('EST005', 'Limpieza Dental', 'Profilaxis dental con ultrasonido', 'Estetica', 800.00, 200.00, 60, TRUE),
+('DIAG001', 'Radiografia Simple', 'Estudio radiologico de una zona', 'Diagnostico', 600.00, 180.00, 30, TRUE),
+('DIAG002', 'Radiografia Torax Completo', 'Estudio radiologico de torax', 'Diagnostico', 900.00, 270.00, 45, TRUE),
+('DIAG003', 'Ultrasonido Abdominal', 'Ecografia de cavidad abdominal', 'Diagnostico', 1200.00, 400.00, 45, TRUE),
+('DIAG004', 'Analisis de Sangre Completo', 'Biometria hematica y quimica sanguinea', 'Diagnostico', 800.00, 250.00, 60, TRUE),
+('DIAG005', 'Examen Coproparasitoscopico', 'Analisis de heces para detectar parasitos', 'Diagnostico', 250.00, 80.00, 30, TRUE),
+('DIAG006', 'Electrocardiograma', 'Estudio de actividad electrica del corazon', 'Diagnostico', 700.00, 200.00, 30, TRUE),
+('TRAT001', 'Desparasitacion Interna', 'Administracion de antiparasitario', 'Consulta', 150.00, 50.00, 15, FALSE),
+('TRAT002', 'Aplicacion Pipeta Antiparasitaria', 'Tratamiento topico contra pulgas y garrapatas', 'Consulta', 200.00, 80.00, 10, FALSE),
+('HOSP001', 'Hospitalizacion Dia', 'Internamiento de 24 horas', 'Hospitalizacion', 800.00, 250.00, 1440, FALSE),
+('HOSP002', 'Hospitalizacion Cuidados Intensivos', 'Atencion especializada continua', 'Hospitalizacion', 1500.00, 500.00, 1440, FALSE),
+('EMER001', 'Consulta de Emergencia', 'Atencion medica urgente', 'Emergencia', 800.00, 200.00, 30, FALSE),
+('EMER002', 'Cirugia de Emergencia', 'Intervencion quirurgica urgente', 'Emergencia', 5000.00, 1500.00, 180, FALSE);
+
+-- Insertar 150 citas (distribuidas en varios meses)
+INSERT INTO citas (folio, mascota_id, dueno_id, servicio_id, empleado_id, fecha_hora, motivo_consulta, sintomas, temperatura, frecuencia_cardiaca, frecuencia_respiratoria, diagnostico, tratamiento, receta, estado, tipo_pago, monto_total, monto_pagado) VALUES
+('CIT-2025-001', 1, 1, 1, 1, '2025-01-15 10:00:00', 'Revision anual', 'Ninguno', 38.5, 90, 25, 'Mascota en excelente estado de salud', 'Continuar con dieta balanceada', 'Vitaminas multiples', 'completada', 'tarjeta', 350.00, 350.00),
+('CIT-2025-002', 2, 1, 3, 1, '2025-01-15 11:00:00', 'Vacunacion Triple Felina', 'Ninguno', 38.2, 150, 30, 'Aplicacion de vacuna sin complicaciones', 'Observacion 24 horas', 'Ninguna', 'completada', 'efectivo', 320.00, 320.00),
+('CIT-2025-003', 3, 2, 5, 1, '2025-01-16 09:00:00', 'Revision dental', 'Mal aliento', 38.0, 110, 28, 'Gingivitis leve', 'Limpieza dental programada', 'Antibiotico oral 7 dias', 'completada', 'tarjeta', 350.00, 350.00),
+('CIT-2025-004', 4, 3, 25, 2, '2025-01-16 14:00:00', 'Desparasitacion', 'Ninguno', 38.3, 140, 32, 'Desparasitacion preventiva', 'Repetir en 3 meses', 'Antiparasitario interno', 'completada', 'efectivo', 150.00, 150.00),
+('CIT-2025-005', 5, 3, 12, 2, '2025-01-17 10:00:00', 'Extraccion dental', 'Dificultad para comer', 38.8, 95, 26, 'Pieza dental fracturada', 'Extraccion bajo sedacion', 'Analgesico 5 dias', 'completada', 'transferencia', 1500.00, 1500.00),
+('CIT-2025-006', 6, 4, 1, 1, '2025-01-18 10:30:00', 'Revision general', 'Ninguno', 38.4, 145, 31, 'Mascota saludable', 'Control en 6 meses', 'Ninguna', 'completada', 'efectivo', 350.00, 350.00),
+('CIT-2025-007', 7, 4, 4, 1, '2025-01-18 15:00:00', 'Vacunacion Multiple Canina', 'Ninguno', 38.6, 88, 24, 'Aplicacion de vacuna Multiple', 'Refuerzo en 30 dias', 'Ninguna', 'completada', 'tarjeta', 300.00, 300.00),
+('CIT-2025-008', 8, 5, 1, 3, '2025-01-19 11:00:00', 'Revision de plumaje', 'Plumas caidas', 39.5, 200, 40, 'Muda natural', 'Suplemento vitaminico', 'Complejo B para aves', 'completada', 'efectivo', 350.00, 350.00),
+('CIT-2025-009', 9, 5, 8, 2, '2025-01-20 08:00:00', 'Esterilizacion', 'Ninguno', 38.5, 92, 26, 'Cirugia exitosa', 'Reposo 10 dias', 'Antibiotico y analgesico', 'completada', 'transferencia', 1800.00, 1800.00),
+('CIT-2025-010', 10, 6, 1, 1, '2025-01-22 09:00:00', 'Consulta primera vez', 'Ninguno', 38.3, 150, 30, 'Gato saludable', 'Programa de vacunacion', 'Ninguna', 'completada', 'efectivo', 350.00, 350.00),
+('CIT-2025-011', 11, 6, 26, 4, '2025-01-22 14:00:00', 'Aplicacion pipeta', 'Presencia de pulgas', 38.0, 105, 27, 'Infestacion leve de pulgas', 'Aplicacion topica', 'Pipeta antiparasitaria', 'completada', 'efectivo', 200.00, 200.00),
+('CIT-2025-012', 12, 7, 3, 1, '2025-01-23 10:00:00', 'Revision piel', 'Rascado excesivo', 38.9, 155, 33, 'Dermatitis alergica', 'Tratamiento con corticoides', 'Prednisona 10 dias', 'completada', 'tarjeta', 600.00, 600.00),
+('CIT-2025-013', 13, 7, 8, 2, '2025-01-24 08:30:00', 'Castracion', 'Ninguno', 38.4, 90, 25, 'Procedimiento sin complicaciones', 'Collar isabelino 7 dias', 'Analgesico 5 dias', 'completada', 'transferencia', 1800.00, 1800.00),
+('CIT-2025-014', 14, 8, 9, 2, '2025-01-25 09:00:00', 'Esterilizacion', 'Ninguno', 38.6, 94, 26, 'Cirugia exitosa', 'Reposo 14 dias', 'Antibiotico y analgesico', 'completada', 'tarjeta', 2200.00, 2200.00),
+('CIT-2025-015', 15, 8, 1, 1, '2025-01-25 11:30:00', 'Control postoperatorio', 'Ninguno', 38.3, 148, 31, 'Recuperacion satisfactoria', 'Retiro de puntos en 10 dias', 'Ninguna', 'completada', 'efectivo', 350.00, 350.00),
+('CIT-2025-016', 16, 9, 14, 8, '2025-01-26 10:00:00', 'Bano medicado', 'Olor fuerte', 38.5, 100, 28, 'Limpieza completa', 'Repetir en 15 dias', 'Shampoo medicado', 'completada', 'efectivo', 300.00, 300.00),
+('CIT-2025-017', 17, 9, 1, 1, '2025-01-26 15:00:00', 'Revision veterinaria', 'Ninguno', 37.0, 180, 35, 'Conejo sano', 'Dieta rica en fibra', 'Ninguna', 'completada', 'tarjeta', 350.00, 350.00),
+('CIT-2025-018', 18, 10, 2, 3, '2025-01-27 09:30:00', 'Problemas respiratorios', 'Respiracion ruidosa', 39.0, 115, 35, 'Sindrome braquicefalico', 'Manejo conservador', 'Ninguna', 'completada', 'transferencia', 500.00, 500.00),
+('CIT-2025-019', 19, 10, 3, 1, '2025-01-28 11:00:00', 'Control de piel', 'Piel seca', 38.4, 160, 32, 'Requiere humectacion', 'Banos con productos especiales', 'Aceite de salmon', 'completada', 'efectivo', 600.00, 600.00),
+('CIT-2025-020', 20, 11, 5, 1, '2025-01-29 10:00:00', 'Vacunacion Antirrabica', 'Ninguno', 38.7, 88, 24, 'Vacuna aplicada correctamente', 'Proxima dosis anual', 'Ninguna', 'completada', 'tarjeta', 200.00, 200.00),
+('CIT-2025-021', 21, 11, 11, 2, '2025-02-01 08:00:00', 'Esterilizacion', 'Ninguno', 38.2, 145, 30, 'Procedimiento exitoso', 'Reposo 10 dias', 'Antibiotico 7 dias', 'completada', 'efectivo', 1500.00, 1500.00),
+('CIT-2025-022', 22, 12, 1, 1, '2025-02-02 09:00:00', 'Revision anual', 'Ninguno', 38.5, 92, 26, 'Estado de salud optimo', 'Continuar cuidados', 'Ninguna', 'completada', 'tarjeta', 350.00, 350.00),
+('CIT-2025-023', 23, 12, 18, 2, '2025-02-03 14:00:00', 'Limpieza dental', 'Sarro dental', 38.0, 108, 27, 'Limpieza con ultrasonido', 'Dieta dental', 'Ninguna', 'completada', 'transferencia', 800.00, 800.00),
+('CIT-2025-024', 24, 13, 3, 1, '2025-02-04 10:30:00', 'Primera consulta', 'Ninguno', 38.6, 152, 31, 'Gato saludable, iniciar vacunacion', 'Calendario vacunal', 'Ninguna', 'completada', 'efectivo', 600.00, 600.00),
+('CIT-2025-025', 25, 13, 15, 8, '2025-02-05 11:00:00', 'Corte de pelo', 'Pelo largo enredado', 38.4, 95, 27, 'Estetica completa', 'Cepillado diario', 'Ninguna', 'completada', 'efectivo', 400.00, 400.00),
+('CIT-2025-026', 26, 14, 8, 2, '2025-02-06 08:00:00', 'Castracion', 'Ninguno', 38.5, 93, 25, 'Cirugia sin complicaciones', 'Collar isabelino', 'Analgesico 5 dias', 'completada', 'tarjeta', 1800.00, 1800.00),
+('CIT-2025-027', 27, 14, 3, 1, '2025-02-07 09:30:00', 'Revision piel', 'Manchas en piel', 38.8, 150, 32, 'Dermatitis por alergia', 'Cambio de dieta', 'Antihistaminico', 'completada', 'efectivo', 600.00, 600.00),
+('CIT-2025-028', 28, 15, 19, 11, '2025-02-08 10:00:00', 'Radiografia', 'Cojera', 38.3, 85, 24, 'Displasia de cadera leve', 'Control con analgesico', 'Carprofeno 15 dias', 'completada', 'transferencia', 600.00, 600.00),
+('CIT-2025-029', 29, 15, 1, 1, '2025-02-09 11:00:00', 'Control postquirurgico', 'Ninguno', 38.4, 145, 30, 'Cicatrizacion correcta', 'Retiro de puntos', 'Ninguna', 'completada', 'efectivo', 350.00, 350.00),
+('CIT-2025-030', 30, 16, 4, 1, '2025-02-10 09:00:00', 'Vacunacion Multiple', 'Ninguno', 38.6, 90, 25, 'Primera dosis aplicada', 'Refuerzo en 21 dias', 'Ninguna', 'completada', 'tarjeta', 300.00, 300.00),
+('CIT-2025-031', 31, 16, 14, 8, '2025-02-11 14:00:00', 'Bano y corte', 'Pelo sucio', 38.2, 95, 26, 'Estetica completa', 'Banos mensuales', 'Ninguna', 'completada', 'efectivo', 400.00, 400.00),
+('CIT-2025-032', 32, 17, 1, 3, '2025-02-12 10:30:00', 'Revision general', 'Ninguno', 38.5, 152, 31, 'Gato en buen estado', 'Control en 6 meses', 'Ninguna', 'completada', 'efectivo', 350.00, 350.00),
+('CIT-2025-033', 33, 17, 5, 1, '2025-02-13 11:00:00', 'Vacunacion', 'Ninguno', 38.7, 88, 24, 'Antirrabica aplicada', 'Proxima dosis anual', 'Ninguna', 'completada', 'tarjeta', 200.00, 200.00),
+('CIT-2025-034', 34, 18, 9, 2, '2025-02-14 08:00:00', 'Esterilizacion', 'Ninguno', 38.4, 92, 26, 'Procedimiento exitoso', 'Reposo 14 dias', 'Antibiotico y analgesico', 'completada', 'transferencia', 2200.00, 2200.00),
+('CIT-2025-035', 35, 18, 3, 1, '2025-02-15 09:30:00', 'Revision piel', 'Caida de pelo', 38.9, 148, 30, 'Dermatitis', 'Shampoo medicado', 'Ketoconazol', 'completada', 'efectivo', 600.00, 600.00),
+('CIT-2025-036', 36, 19, 1, 1, '2025-02-16 10:00:00', 'Consulta general', 'Ninguno', 38.5, 95, 27, 'Mascota saludable', 'Continuar cuidados', 'Ninguna', 'completada', 'tarjeta', 350.00, 350.00),
+('CIT-2025-037', 37, 19, 6, 1, '2025-02-17 11:30:00', 'Revision cardiaca', 'Fatiga al ejercicio', 39.0, 120, 35, 'Cardiomegalia leve', 'Control cardiologico', 'Enalapril', 'completada', 'transferencia', 600.00, 600.00),
+('CIT-2025-038', 38, 20, 1, 1, '2025-02-18 09:00:00', 'Primera consulta', 'Ninguno', 36.8, 185, 38, 'Hamster saludable', 'Dieta balanceada', 'Ninguna', 'completada', 'efectivo', 350.00, 350.00),
+('CIT-2025-039', 39, 20, 8, 2, '2025-02-19 08:00:00', 'Castracion', 'Ninguno', 38.6, 93, 25, 'Cirugia sin complicaciones', 'Reposo 7 dias', 'Analgesico', 'completada', 'tarjeta', 1800.00, 1800.00),
+('CIT-2025-040', 40, 21, 3, 1, '2025-02-20 10:30:00', 'Revision piel', 'Rascado', 38.7, 155, 32, 'Alergia alimentaria', 'Dieta hipoalergenica', 'Ninguna', 'completada', 'efectivo', 600.00, 600.00),
+('CIT-2025-041', 41, 21, 1, 1, '2025-02-21 11:00:00', 'Control anual', 'Ninguno', 38.4, 88, 24, 'Estado optimo', 'Control en 12 meses', 'Ninguna', 'completada', 'transferencia', 350.00, 350.00),
+('CIT-2025-042', 42, 22, 1, 3, '2025-02-22 09:30:00', 'Revision veterinaria', 'Ninguno', 37.2, 175, 36, 'Conejo sano', 'Continuar dieta', 'Ninguna', 'completada', 'efectivo', 350.00, 350.00),
+('CIT-2025-043', 43, 22, 8, 2, '2025-02-23 08:00:00', 'Castracion', 'Ninguno', 38.5, 95, 26, 'Procedimiento exitoso', 'Collar isabelino', 'Analgesico 5 dias', 'completada', 'tarjeta', 1800.00, 1800.00),
+('CIT-2025-044', 44, 23, 19, 11, '2025-02-24 10:00:00', 'Radiografia cadera', 'Dificultad para levantarse', 38.8, 82, 23, 'Displasia de cadera moderada', 'Manejo con analgesicos', 'Meloxicam', 'completada', 'transferencia', 600.00, 600.00),
+('CIT-2025-045', 45, 23, 3, 1, '2025-02-25 11:30:00', 'Revision dermatologica', 'Pelo opaco', 38.3, 150, 31, 'Deficiencia nutricional', 'Suplemento Omega 3', 'Aceite de pescado', 'completada', 'efectivo', 600.00, 600.00),
+('CIT-2025-046', 46, 24, 1, 1, '2025-02-26 09:00:00', 'Consulta general', 'Ninguno', 38.6, 90, 25, 'Mascota saludable', 'Control semestral', 'Ninguna', 'completada', 'tarjeta', 350.00, 350.00),
+('CIT-2025-047', 47, 24, 3, 1, '2025-02-27 10:30:00', 'Primera consulta', 'Ninguno', 38.2, 145, 30, 'Gato saludable', 'Programa de vacunacion', 'Ninguna', 'completada', 'efectivo', 600.00, 600.00),
+('CIT-2025-048', 48, 25, 9, 2, '2025-02-28 08:00:00', 'Esterilizacion', 'Ninguno', 38.5, 93, 26, 'Cirugia exitosa', 'Reposo 14 dias', 'Antibiotico y analgesico', 'completada', 'transferencia', 2200.00, 2200.00),
+('CIT-2025-049', 49, 25, 1, 1, '2025-03-01 09:30:00', 'Control postoperatorio', 'Ninguno', 38.4, 92, 25, 'Recuperacion adecuada', 'Retiro de puntos', 'Ninguna', 'completada', 'efectivo', 350.00, 350.00),
+('CIT-2025-050', 50, 26, 8, 2, '2025-03-02 08:00:00', 'Castracion', 'Ninguno', 38.7, 88, 24, 'Procedimiento sin complicaciones', 'Collar isabelino 7 dias', 'Analgesico', 'completada', 'tarjeta', 1800.00, 1800.00),
+('CIT-2025-051', 51, 26, 3, 1, '2025-03-03 10:00:00', 'Revision piel', 'Manchas en piel', 38.9, 153, 31, 'Dermatitis', 'Tratamiento topico', 'Crema antibiotica', 'completada', 'efectivo', 600.00, 600.00),
+('CIT-2025-052', 52, 27, 1, 3, '2025-03-04 11:00:00', 'Consulta reptil', 'Falta de apetito', 32.0, 60, 15, 'Parametros ambientales incorrectos', 'Ajustar temperatura', 'Ninguna', 'completada', 'transferencia', 350.00, 350.00),
+('CIT-2025-053', 53, 27, 11, 2, '2025-03-05 08:00:00', 'Esterilizacion', 'Ninguno', 38.3, 148, 30, 'Cirugia sin complicaciones', 'Reposo 10 dias', 'Antibiotico', 'completada', 'efectivo', 1500.00, 1500.00),
+('CIT-2025-054', 54, 28, 8, 2, '2025-03-06 08:30:00', 'Castracion', 'Ninguno', 38.6, 95, 26, 'Procedimiento exitoso', 'Reposo 10 dias', 'Analgesico 5 dias', 'completada', 'tarjeta', 1800.00, 1800.00),
+('CIT-2025-055', 55, 28, 3, 1, '2025-03-07 09:30:00', 'Revision piel', 'Ninguno', 38.4, 155, 32, 'Gato saludable', 'Control anual', 'Ninguna', 'completada', 'efectivo', 600.00, 600.00),
+('CIT-2025-056', 56, 29, 1, 1, '2025-03-08 10:00:00', 'Consulta hiperactividad', 'Comportamiento hiperactivo', 38.5, 110, 28, 'Hiperactividad por raza', 'Ejercicio y entrenamiento', 'Ninguna', 'completada', 'transferencia', 350.00, 350.00),
+('CIT-2025-057', 57, 29, 11, 2, '2025-03-09 08:00:00', 'Esterilizacion', 'Ninguno', 38.2, 150, 31, 'Cirugia sin complicaciones', 'Reposo 10 dias', 'Antibiotico 7 dias', 'completada', 'efectivo', 1500.00, 1500.00),
+('CIT-2025-058', 58, 30, 1, 1, '2025-03-10 09:00:00', 'Consulta general', 'Ninguno', 38.7, 90, 25, 'Mascota saludable', 'Control semestral', 'Ninguna', 'completada', 'tarjeta', 350.00, 350.00),
+('CIT-2025-059', 59, 30, 3, 1, '2025-03-11 10:30:00', 'Revision piel', 'Ninguno', 38.4, 152, 30, 'Gato en buen estado', 'Continuar cuidados', 'Ninguna', 'completada', 'efectivo', 600.00, 600.00),
+('CIT-2025-060', 60, 31, 19, 11, '2025-03-12 11:00:00', 'Radiografia', 'Cojera leve', 38.8, 85, 24, 'Displasia de cadera', 'Control con analgesico', 'Carprofeno', 'completada', 'transferencia', 600.00, 600.00),
+('CIT-2025-061', 61, 31, 11, 2, '2025-03-13 08:00:00', 'Esterilizacion', 'Ninguno', 38.3, 147, 29, 'Procedimiento exitoso', 'Reposo 10 dias', 'Antibiotico', 'completada', 'efectivo', 1500.00, 1500.00),
+('CIT-2025-062', 62, 32, 8, 2, '2025-03-14 08:30:00', 'Castracion', 'Ninguno', 38.6, 92, 26, 'Cirugia sin complicaciones', 'Collar isabelino', 'Analgesico 5 dias', 'completada', 'tarjeta', 1800.00, 1800.00),
+('CIT-2025-063', 63, 32, 3, 1, '2025-03-15 10:00:00', 'Revision dermatologica', 'Ninguno', 38.5, 155, 31, 'Gato saludable', 'Control anual', 'Ninguna', 'completada', 'efectivo', 600.00, 600.00),
+('CIT-2025-064', 64, 33, 1, 1, '2025-03-16 09:30:00', 'Consulta general', 'Ninguno', 38.7, 88, 24, 'Mascota en buen estado', 'Control semestral', 'Ninguna', 'completada', 'transferencia', 350.00, 350.00),
+('CIT-2025-065', 65, 33, 11, 2, '2025-03-17 08:00:00', 'Esterilizacion', 'Ninguno', 38.2, 148, 30, 'Cirugia exitosa', 'Reposo 10 dias', 'Antibiotico 7 dias', 'completada', 'efectivo', 1500.00, 1500.00),
+('CIT-2025-066', 66, 34, 6, 15, '2025-03-18 10:00:00', 'Revision cardiaca', 'Fatiga', 39.0, 110, 32, 'Cardiomiopatia detectada', 'Tratamiento cronico', 'Enalapril y furosemida', 'completada', 'tarjeta', 600.00, 600.00),
+('CIT-2025-067', 67, 34, 14, 8, '2025-03-19 11:00:00', 'Bano y corte', 'Pelo enredado', 38.4, 95, 27, 'Estetica completa', 'Cepillado diario', 'Ninguna', 'completada', 'efectivo', 400.00, 400.00),
+('CIT-2025-068', 68, 35, 8, 2, '2025-03-20 08:00:00', 'Castracion', 'Ninguno', 38.6, 90, 25, 'Procedimiento sin complicaciones', 'Reposo 10 dias', 'Analgesico', 'completada', 'transferencia', 1800.00, 1800.00),
+('CIT-2025-069', 69, 35, 3, 1, '2025-03-21 09:30:00', 'Revision piel', 'Ninguno', 38.3, 152, 31, 'Gato saludable', 'Control anual', 'Ninguna', 'completada', 'efectivo', 600.00, 600.00),
+('CIT-2025-070', 70, 36, 1, 1, '2025-03-22 10:00:00', 'Consulta general', 'Ninguno', 38.5, 93, 26, 'Mascota en buen estado', 'Continuar cuidados', 'Ninguna', 'completada', 'tarjeta', 350.00, 350.00),
+('CIT-2025-071', 71, 36, 1, 3, '2025-03-23 11:00:00', 'Consulta ave', 'Ninguno', 40.0, 210, 42, 'Ave saludable', 'Dieta balanceada', 'Ninguna', 'completada', 'efectivo', 350.00, 350.00),
+('CIT-2025-072', 72, 37, 1, 1, '2025-03-24 09:30:00', 'Consulta general', 'Ninguno', 38.7, 88, 24, 'Mascota saludable', 'Control semestral', 'Ninguna', 'completada', 'transferencia', 350.00, 350.00),
+('CIT-2025-073', 73, 37, 14, 8, '2025-03-25 14:00:00', 'Bano medicado', 'Ninguno', 38.4, 147, 30, 'Limpieza completa', 'Repetir mensual', 'Ninguna', 'completada', 'efectivo', 300.00, 300.00),
+('CIT-2025-074', 74, 38, 1, 1, '2025-03-26 10:00:00', 'Consulta general', 'Ninguno', 38.6, 95, 27, 'Mascota en buen estado', 'Control semestral', 'Ninguna', 'completada', 'tarjeta', 350.00, 350.00),
+('CIT-2025-075', 75, 38, 11, 2, '2025-03-27 08:00:00', 'Esterilizacion', 'Ninguno', 38.2, 150, 31, 'Cirugia sin complicaciones', 'Reposo 10 dias', 'Antibiotico', 'completada', 'efectivo', 1500.00, 1500.00),
+('CIT-2025-076', 76, 39, 19, 11, '2025-03-28 11:00:00', 'Radiografia', 'Dolor en cadera', 38.9, 82, 23, 'Displasia de cadera severa', 'Manejo con analgesicos', 'Carprofeno cronico', 'completada', 'transferencia', 600.00, 600.00),
+('CIT-2025-077', 77, 39, 1, 1, '2025-03-29 09:30:00', 'Consulta conejo', 'Ninguno', 37.5, 180, 37, 'Conejo saludable', 'Dieta rica en fibra', 'Ninguna', 'completada', 'efectivo', 350.00, 350.00),
+('CIT-2025-078', 78, 40, 1, 1, '2025-03-30 10:00:00', 'Consulta general', 'Ninguno', 38.5, 92, 26, 'Mascota saludable', 'Control semestral', 'Ninguna', 'completada', 'tarjeta', 350.00, 350.00),
+('CIT-2025-079', 79, 40, 3, 1, '2025-03-31 11:00:00', 'Revision piel', 'Ninguno', 38.3, 153, 30, 'Gato en buen estado', 'Control anual', 'Ninguna', 'completada', 'efectivo', 600.00, 600.00),
+('CIT-2025-080', 80, 41, 1, 1, '2025-04-01 09:00:00', 'Consulta general', 'Ninguno', 38.7, 88, 24, 'Mascota en buen estado', 'Continuar cuidados', 'Ninguna', 'completada', 'transferencia', 350.00, 350.00),
+('CIT-2025-081', 81, 41, 1, 3, '2025-04-02 10:30:00', 'Consulta ave', 'Canto debil', 40.5, 220, 44, 'Posible infeccion respiratoria', 'Antibiotico aviar', 'Enrofloxacina', 'completada', 'efectivo', 350.00, 350.00),
+('CIT-2025-082', 82, 42, 1, 1, '2025-04-03 11:00:00', 'Consulta general', 'Ninguno', 38.6, 90, 25, 'Mascota saludable', 'Control semestral', 'Ninguna', 'completada', 'tarjeta', 350.00, 350.00),
+('CIT-2025-083', 83, 42, 1, 1, '2025-04-04 09:30:00', 'Consulta hamster', 'Ninguno', 37.0, 190, 40, 'Hamster sano', 'Dieta balanceada', 'Ninguna', 'completada', 'efectivo', 350.00, 350.00),
+('CIT-2025-084', 84, 43, 1, 1, '2025-04-05 10:00:00', 'Consulta general', 'Ninguno', 38.5, 93, 26, 'Mascota en buen estado', 'Control semestral', 'Ninguna', 'completada', 'transferencia', 350.00, 350.00),
+('CIT-2025-085', 85, 43, 1, 1, '2025-04-06 11:00:00', 'Consulta conejo', 'Ninguno', 37.3, 175, 36, 'Conejo saludable', 'Continuar dieta', 'Ninguna', 'completada', 'efectivo', 350.00, 350.00),
+('CIT-2025-086', 86, 44, 1, 1, '2025-04-07 09:00:00', 'Consulta general', 'Ninguno', 38.7, 95, 27, 'Mascota saludable', 'Control semestral', 'Ninguna', 'completada', 'tarjeta', 350.00, 350.00),
+('CIT-2025-087', 87, 44, 3, 1, '2025-04-08 10:30:00', 'Revision piel', 'Ninguno', 38.4, 150, 31, 'Gato en buen estado', 'Control anual', 'Ninguna', 'completada', 'efectivo', 600.00, 600.00),
+('CIT-2025-088', 88, 45, 1, 1, '2025-04-09 11:00:00', 'Consulta general', 'Ninguno', 38.6, 88, 24, 'Mascota en buen estado', 'Continuar cuidados', 'Ninguna', 'completada', 'transferencia', 350.00, 350.00),
+('CIT-2025-089', 89, 45, 11, 2, '2025-04-10 08:00:00', 'Esterilizacion', 'Ninguno', 38.2, 148, 30, 'Cirugia sin complicaciones', 'Reposo 10 dias', 'Antibiotico', 'completada', 'efectivo', 1500.00, 1500.00),
+('CIT-2025-090', 90, 46, 19, 11, '2025-04-11 10:00:00', 'Radiografia', 'Dolor en cadera', 38.8, 80, 22, 'Displasia de cadera leve', 'Control con analgesico', 'Carprofeno', 'completada', 'tarjeta', 600.00, 600.00),
+('CIT-2025-091', 91, 46, 3, 1, '2025-04-12 11:30:00', 'Revision piel', 'Ninguno', 38.5, 152, 31, 'Gato saludable', 'Control anual', 'Ninguna', 'completada', 'efectivo', 600.00, 600.00),
+('CIT-2025-092', 92, 47, 1, 1, '2025-04-13 09:00:00', 'Consulta general', 'Ninguno', 38.7, 90, 25, 'Mascota en buen estado', 'Control semestral', 'Ninguna', 'completada', 'transferencia', 350.00, 350.00),
+('CIT-2025-093', 93, 47, 1, 1, '2025-04-14 10:30:00', 'Consulta conejo', 'Ninguno', 37.4, 178, 37, 'Conejo sano', 'Dieta balanceada', 'Ninguna', 'completada', 'efectivo', 350.00, 350.00),
+('CIT-2025-094', 94, 48, 1, 1, '2025-04-15 11:00:00', 'Consulta general', 'Ninguno', 38.6, 93, 26, 'Mascota saludable', 'Control semestral', 'Ninguna', 'completada', 'tarjeta', 350.00, 350.00),
+('CIT-2025-095', 95, 48, 1, 3, '2025-04-16 09:30:00', 'Consulta ave', 'Ninguno', 40.2, 215, 43, 'Ave saludable', 'Continuar dieta', 'Ninguna', 'completada', 'efectivo', 350.00, 350.00),
+('CIT-2025-096', 96, 49, 1, 1, '2025-04-17 10:00:00', 'Consulta general', 'Ninguno', 38.5, 88, 24, 'Mascota en buen estado', 'Control semestral', 'Ninguna', 'completada', 'transferencia', 350.00, 350.00),
+('CIT-2025-097', 97, 49, 1, 1, '2025-04-18 11:00:00', 'Consulta hamster', 'Ninguno', 37.1, 185, 39, 'Hamster saludable', 'Dieta balanceada', 'Ninguna', 'completada', 'efectivo', 350.00, 350.00),
+('CIT-2025-098', 98, 50, 1, 1, '2025-04-19 09:00:00', 'Consulta general', 'Ninguno', 38.7, 92, 26, 'Mascota saludable', 'Control semestral', 'Ninguna', 'completada', 'tarjeta', 350.00, 350.00),
+('CIT-2025-099', 99, 50, 3, 1, '2025-04-20 10:30:00', 'Revision piel', 'Ninguno', 38.4, 150, 30, 'Gato en buen estado', 'Control anual', 'Ninguna', 'completada', 'efectivo', 600.00, 600.00),
+('CIT-2025-100', 100, 1, 4, 1, '2025-04-21 11:00:00', 'Vacunacion', 'Ninguno', 38.6, 90, 25, 'Vacuna Multiple aplicada', 'Refuerzo en 21 dias', 'Ninguna', 'completada', 'transferencia', 300.00, 300.00),
+('CIT-2025-101', 1, 1, 1, 1, '2025-10-20 10:00:00', 'Chequeo rutinario', 'Ninguno', 38.5, 90, 25, 'Mascota saludable', 'Control en 6 meses', 'Ninguna', 'pendiente', 'efectivo', 350.00, 0.00),
+('CIT-2025-102', 5, 3, 25, 2, '2025-10-21 14:00:00', 'Desparasitacion trimestral', 'Ninguno', NULL, NULL, NULL, NULL, NULL, NULL, 'pendiente', 'efectivo', 150.00, 0.00),
+('CIT-2025-103', 10, 6, 3, 1, '2025-10-22 09:00:00', 'Vacunacion Triple Felina', 'Ninguno', NULL, NULL, NULL, NULL, NULL, NULL, 'pendiente', 'tarjeta', 320.00, 0.00),
+('CIT-2025-104', 15, 8, 1, 1, '2025-10-23 11:30:00', 'Revision anual', 'Ninguno', NULL, NULL, NULL, NULL, NULL, NULL, 'pendiente', 'efectivo', 350.00, 0.00),
+('CIT-2025-105', 20, 11, 4, 1, '2025-10-24 10:00:00', 'Vacunacion Multiple', 'Ninguno', NULL, NULL, NULL, NULL, NULL, NULL, 'pendiente', 'tarjeta', 300.00, 0.00),
+('CIT-2025-106', 25, 13, 14, 8, '2025-10-25 15:00:00', 'Bano y corte estetico', 'Ninguno', NULL, NULL, NULL, NULL, NULL, NULL, 'pendiente', 'efectivo', 400.00, 0.00),
+('CIT-2025-107', 30, 16, 1, 1, '2025-10-26 09:30:00', 'Consulta general', 'Ninguno', NULL, NULL, NULL, NULL, NULL, NULL, 'pendiente', 'transferencia', 350.00, 0.00),
+('CIT-2025-108', 35, 18, 18, 2, '2025-10-27 14:00:00', 'Limpieza dental programada', 'Sarro acumulado', NULL, NULL, NULL, NULL, NULL, NULL, 'pendiente', 'tarjeta', 800.00, 0.00),
+('CIT-2025-109', 40, 21, 1, 1, '2025-10-28 10:00:00', 'Control anual', 'Ninguno', NULL, NULL, NULL, NULL, NULL, NULL, 'pendiente', 'efectivo', 350.00, 0.00),
+('CIT-2025-110', 45, 23, 19, 11, '2025-10-29 11:00:00', 'Radiografia de control', 'Cojera persistente', NULL, NULL, NULL, NULL, NULL, NULL, 'pendiente', 'transferencia', 600.00, 0.00),
+('CIT-2025-111', 50, 26, 1, 1, '2025-10-30 09:00:00', 'Revision postoperatoria', 'Ninguno', NULL, NULL, NULL, NULL, NULL, NULL, 'pendiente', 'efectivo', 350.00, 0.00),
+('CIT-2025-112', 55, 28, 1, 1, '2025-10-31 10:30:00', 'Chequeo general', 'Ninguno', NULL, NULL, NULL, NULL, NULL, NULL, 'pendiente', 'tarjeta', 350.00, 0.00),
+('CIT-2025-113', 60, 31, 4, 1, '2025-11-01 11:00:00', 'Vacunacion Multiple', 'Ninguno', NULL, NULL, NULL, NULL, NULL, NULL, 'pendiente', 'efectivo', 300.00, 0.00),
+('CIT-2025-114', 65, 33, 1, 1, '2025-11-02 09:30:00', 'Control postquirurgico', 'Ninguno', NULL, NULL, NULL, NULL, NULL, NULL, 'pendiente', 'transferencia', 350.00, 0.00),
+('CIT-2025-115', 70, 36, 25, 2, '2025-11-03 14:00:00', 'Desparasitacion', 'Ninguno', NULL, NULL, NULL, NULL, NULL, NULL, 'pendiente', 'efectivo', 150.00, 0.00),
+('CIT-2025-116', 75, 38, 1, 1, '2025-11-04 10:00:00', 'Revision anual', 'Ninguno', NULL, NULL, NULL, NULL, NULL, NULL, 'pendiente', 'tarjeta', 350.00, 0.00),
+('CIT-2025-117', 80, 41, 1, 1, '2025-11-05 11:30:00', 'Consulta general', 'Ninguno', NULL, NULL, NULL, NULL, NULL, NULL, 'pendiente', 'efectivo', 350.00, 0.00),
+('CIT-2025-118', 85, 43, 1, 1, '2025-11-06 09:00:00', 'Chequeo rutinario', 'Ninguno', NULL, NULL, NULL, NULL, NULL, NULL, 'pendiente', 'transferencia', 350.00, 0.00),
+('CIT-2025-119', 90, 46, 14, 8, '2025-11-07 15:00:00', 'Bano medicado', 'Olor fuerte', NULL, NULL, NULL, NULL, NULL, NULL, 'pendiente', 'tarjeta', 300.00, 0.00),
+('CIT-2025-120', 95, 48, 1, 3, '2025-11-08 10:30:00', 'Consulta ave', 'Revision general', NULL, NULL, NULL, NULL, NULL, NULL, 'pendiente', 'efectivo', 350.00, 0.00),
+('CIT-2025-121', 12, 7, 1, 1, '2025-05-15 09:00:00', 'Seguimiento dermatologico', 'Mejoria en piel', 38.5, 152, 32, 'Dermatitis controlada', 'Continuar tratamiento', 'Prednisona 5 dias mas', 'completada', 'efectivo', 350.00, 350.00),
+('CIT-2025-122', 28, 15, 1, 1, '2025-06-10 10:00:00', 'Control de displasia', 'Cojera leve', 38.6, 88, 25, 'Displasia estable', 'Continuar analgesico', 'Carprofeno cronico', 'completada', 'tarjeta', 350.00, 350.00),
+('CIT-2025-123', 55, 28, 2, 3, '2025-07-08 14:00:00', 'Seguimiento dermatologico', 'Mejoria notable', 38.4, 158, 33, 'Dermatitis en remision', 'Reducir medicamento', 'Prednisona dosis baja', 'completada', 'efectivo', 500.00, 500.00),
+('CIT-2025-124', 66, 34, 6, 15, '2025-08-12 09:30:00', 'Control cardiologico', 'Menos fatiga', 38.7, 100, 28, 'Cardiomiopatia controlada', 'Continuar tratamiento', 'Enalapril y furosemida', 'completada', 'transferencia', 600.00, 600.00),
+('CIT-2025-125', 76, 39, 1, 1, '2025-09-18 11:00:00', 'Control de displasia', 'Dolor persistente', 38.9, 84, 24, 'Displasia progresando', 'Evaluar cirugia', 'Carprofeno + tramadol', 'completada', 'tarjeta', 350.00, 350.00);
+
+-- Insertar historial medico (50 registros)
+INSERT INTO historial_medico (mascota_id, cita_id, fecha, tipo_registro, peso_registro, tratamiento, medicamentos, dosis, frecuencia, duracion_tratamiento, examenes_realizados, resultados_examenes, procedimientos, proximo_seguimiento, observaciones, empleado_responsable) VALUES
+(1, 1, '2025-01-15', 'Consulta', 28.50, 'Revision general anual', 'Multivitaminico', '1 tableta', 'Cada 24 horas', '30 dias', 'Examen fisico completo', 'Todos los parametros normales', 'Ninguno', '2025-07-15', 'Mascota en excelente condicion', 1),
+(2, 2, '2025-01-15', 'Vacuna', 4.20, 'Inmunizacion', 'Vacuna Triple Felina', '1 dosis', 'Dosis unica', 'N/A', 'Ninguno', 'N/A', 'Aplicacion subcutanea', '2025-02-15', 'Proxima dosis de refuerzo', 1),
+(3, 3, '2025-01-16', 'Consulta', 3.80, 'Tratamiento gingivitis', 'Antibiotico oral', '1 ml', 'Cada 12 horas', '7 dias', 'Examen dental', 'Gingivitis leve', 'Ninguno', '2025-02-16', 'Programar limpieza dental', 1),
+(4, 4, '2025-01-16', 'Consulta', 3.50, 'Desparasitacion preventiva', 'Antiparasitario interno', '1 tableta', 'Dosis unica', 'N/A', 'Ninguno', 'N/A', 'Administracion oral', '2025-04-16', 'Repetir en 3 meses', 2),
+(5, 5, '2025-01-17', 'Cirugia', 15.00, 'Extraccion dental', 'Analgesico', '2 ml', 'Cada 12 horas', '5 dias', 'Radiografia dental', 'Pieza dental fracturada', 'Extraccion bajo sedacion', '2025-01-24', 'Dieta blanda 7 dias', 2),
+(6, 6, '2025-01-18', 'Consulta', 4.80, 'Revision general', 'Ninguno', 'N/A', 'N/A', 'N/A', 'Examen fisico', 'Parametros normales', 'Ninguno', '2025-07-18', 'Mascota saludable', 1),
+(7, 7, '2025-01-18', 'Vacuna', 32.00, 'Inmunizacion Multiple', 'Vacuna Multiple Canina', '1 dosis', 'Dosis unica', 'N/A', 'Ninguno', 'N/A', 'Aplicacion subcutanea', '2025-02-18', 'Refuerzo programado', 1),
+(8, 8, '2025-01-19', 'Consulta', 0.35, 'Suplementacion vitaminica', 'Complejo B', '3 gotas', 'Cada 24 horas', '15 dias', 'Examen de plumaje', 'Muda natural', 'Ninguno', '2025-02-19', 'Proceso normal', 3),
+(9, 9, '2025-01-20', 'Cirugia', 22.00, 'Esterilizacion', 'Antibiotico + Analgesico', '2 ml + 1 ml', 'Cada 12 horas', '10 dias', 'Prequirurgico normal', 'Sin complicaciones', 'Ovariohisterectomia', '2025-01-30', 'Retiro de puntos dia 30', 2),
+(10, 10, '2025-01-22', 'Consulta', 7.50, 'Inicio programa vacunacion', 'Ninguno', 'N/A', 'N/A', 'N/A', 'Examen fisico inicial', 'Gato saludable', 'Ninguno', '2025-02-22', 'Primera vacuna proxima visita', 1),
+(11, 11, '2025-01-22', 'Consulta', 12.50, 'Control de pulgas', 'Pipeta antiparasitaria', '1 pipeta', 'Dosis unica', 'Mensual', 'Inspeccion de piel', 'Pulgas presentes', 'Aplicacion topica', '2025-02-22', 'Repetir mensualmente', 4),
+(12, 12, '2025-01-23', 'Consulta', 4.00, 'Tratamiento alergico', 'Prednisona', '5 mg', 'Cada 24 horas', '10 dias', 'Examen dermatologico', 'Dermatitis alergica', 'Ninguno', '2025-02-23', 'Considerar cambio de dieta', 1),
+(13, 13, '2025-01-24', 'Cirugia', 35.00, 'Castracion', 'Analgesico', '3 ml', 'Cada 12 horas', '5 dias', 'Prequirurgico normal', 'Sin complicaciones', 'Castracion', '2025-01-31', 'Collar isabelino 7 dias', 2),
+(14, 14, '2025-01-25', 'Cirugia', 28.00, 'Esterilizacion', 'Antibiotico + Analgesico', '2 ml + 2 ml', 'Cada 12 horas', '14 dias', 'Prequirurgico normal', 'Cirugia exitosa', 'Ovariohisterectomia', '2025-02-08', 'Retiro de puntos dia 8', 2),
+(15, 15, '2025-01-25', 'Seguimiento', 5.50, 'Control postoperatorio', 'Ninguno', 'N/A', 'N/A', 'N/A', 'Revision de incision', 'Cicatrizacion normal', 'Ninguno', NULL, 'Alta medica', 1),
+(16, 16, '2025-01-26', 'Consulta', 8.00, 'Bano terapeutico', 'Shampoo medicado', 'N/A', 'Uso topico', 'N/A', 'Ninguno', 'N/A', 'Bano completo', '2025-02-10', 'Repetir en 15 dias', 8),
+(17, 17, '2025-01-26', 'Consulta', 2.20, 'Recomendaciones nutricionales', 'Ninguno', 'N/A', 'N/A', 'N/A', 'Examen fisico', 'Conejo saludable', 'Ninguno', '2025-07-26', 'Dieta rica en fibra', 1),
+(18, 18, '2025-01-27', 'Consulta', 11.00, 'Manejo conservador', 'Ninguno', 'N/A', 'N/A', 'N/A', 'Evaluacion respiratoria', 'Sindrome braquicefalico', 'Ninguno', '2025-02-27', 'Evitar ejercicio intenso', 3),
+(19, 19, '2025-01-28', 'Consulta', 4.50, 'Tratamiento dermatologico', 'Aceite de salmon', '1 capsula', 'Cada 24 horas', '30 dias', 'Examen de piel', 'Piel seca', 'Ninguno', '2025-02-28', 'Mejoria esperada en 2 semanas', 1),
+(20, 20, '2025-01-29', 'Vacuna', 45.00, 'Inmunizacion antirrabica', 'Vacuna Antirrabica', '1 dosis', 'Anual', 'N/A', 'Ninguno', 'N/A', 'Aplicacion subcutanea', '2026-01-29', 'Proxima dosis en 1 ano', 1),
+(21, 21, '2025-02-01', 'Cirugia', 3.80, 'Esterilizacion felina', 'Antibiotico', '1 ml', 'Cada 24 horas', '7 dias', 'Prequirurgico normal', 'Sin complicaciones', 'Ovariohisterectomia', '2025-02-11', 'Retiro de puntos dia 11', 2),
+(22, 22, '2025-02-02', 'Consulta', 30.00, 'Revision anual', 'Ninguno', 'N/A', 'N/A', 'N/A', 'Examen fisico completo', 'Todos los parametros normales', 'Ninguno', '2026-02-02', 'Mascota en excelente estado', 1),
+(23, 23, '2025-02-03', 'Consulta', 13.00, 'Profilaxis dental', 'Ninguno', 'N/A', 'N/A', 'N/A', 'Examen dental', 'Sarro moderado', 'Limpieza con ultrasonido', '2025-08-03', 'Dieta dental recomendada', 2),
+(24, 24, '2025-02-04', 'Consulta', 3.50, 'Inicio vacunacion', 'Ninguno', 'N/A', 'N/A', 'N/A', 'Examen fisico inicial', 'Gato saludable', 'Ninguno', '2025-02-25', 'Primera vacuna proxima visita', 1),
+(25, 25, '2025-02-05', 'Consulta', 6.50, 'Estetica canina', 'Ninguno', 'N/A', 'N/A', 'N/A', 'Ninguno', 'N/A', 'Corte de pelo completo', '2025-03-05', 'Cepillado diario recomendado', 8),
+(26, 26, '2025-02-06', 'Cirugia', 27.00, 'Castracion', 'Analgesico', '2 ml', 'Cada 12 horas', '5 dias', 'Prequirurgico normal', 'Sin complicaciones', 'Castracion', '2025-02-11', 'Alta en 5 dias', 2),
+(27, 27, '2025-02-07', 'Consulta', 24.00, 'Tratamiento alergico', 'Antihistaminico', '1 tableta', 'Cada 12 horas', '14 dias', 'Examen dermatologico', 'Dermatitis alergica', 'Ninguno', '2025-02-21', 'Cambio de dieta recomendado', 1),
+(28, 28, '2025-02-08', 'Diagnostico', 75.00, 'Manejo de displasia', 'Carprofeno', '75 mg', 'Cada 12 horas', '15 dias', 'Radiografia de cadera', 'Displasia leve', 'Ninguno', '2025-03-08', 'Control mensual', 11),
+(29, 29, '2025-02-09', 'Seguimiento', 4.60, 'Control postoperatorio', 'Ninguno', 'N/A', 'N/A', 'N/A', 'Revision de incision', 'Cicatrizacion correcta', 'Retiro de puntos', NULL, 'Alta medica', 1),
+(30, 30, '2025-02-10', 'Vacuna', 70.00, 'Inmunizacion Multiple', 'Vacuna Multiple Canina', '1 dosis', 'Primera dosis', 'N/A', 'Ninguno', 'N/A', 'Aplicacion subcutanea', '2025-03-03', 'Refuerzo en 21 dias', 1),
+(31, 31, '2025-02-11', 'Consulta', 9.00, 'Estetica completa', 'Ninguno', 'N/A', 'N/A', 'N/A', 'Ninguno', 'N/A', 'Bano y corte', '2025-03-11', 'Banos mensuales recomendados', 8),
+(32, 32, '2025-02-12', 'Consulta', 3.60, 'Revision general', 'Ninguno', 'N/A', 'N/A', 'N/A', 'Examen fisico', 'Gato saludable', 'Ninguno', '2025-08-12', 'Control semestral', 3),
+(33, 33, '2025-02-13', 'Vacuna', 60.00, 'Inmunizacion antirrabica', 'Vacuna Antirrabica', '1 dosis', 'Anual', 'N/A', 'Ninguno', 'N/A', 'Aplicacion subcutanea', '2026-02-13', 'Proxima dosis en 1 ano', 1),
+(34, 34, '2025-02-14', 'Cirugia', 18.00, 'Esterilizacion', 'Antibiotico + Analgesico', '2 ml + 2 ml', 'Cada 12 horas', '14 dias', 'Prequirurgico normal', 'Cirugia exitosa', 'Ovariohisterectomia', '2025-02-28', 'Retiro de puntos dia 28', 2),
+(35, 35, '2025-02-15', 'Consulta', 5.20, 'Tratamiento dermatitis', 'Ketoconazol', '5 ml', 'Cada 12 horas', '10 dias', 'Examen dermatologico', 'Dermatitis fungica', 'Ninguno', '2025-02-25', 'Bano con shampoo medicado', 1),
+(36, 36, '2025-02-16', 'Consulta', 42.00, 'Revision general', 'Ninguno', 'N/A', 'N/A', 'N/A', 'Examen fisico', 'Mascota saludable', 'Ninguno', '2025-08-16', 'Control semestral', 1),
+(37, 37, '2025-02-17', 'Consulta', 42.00, 'Manejo cardiaco', 'Enalapril', '10 mg', 'Cada 12 horas', 'Indefinido', 'Electrocardiograma', 'Cardiomegalia leve', 'Ninguno', '2025-03-17', 'Control mensual', 1),
+(38, 38, '2025-02-18', 'Consulta', 0.15, 'Cuidados hamster', 'Ninguno', 'N/A', 'N/A', 'N/A', 'Examen fisico', 'Hamster saludable', 'Ninguno', '2025-08-18', 'Dieta balanceada', 1),
+(39, 39, '2025-02-19', 'Cirugia', 25.00, 'Castracion', 'Analgesico', '2 ml', 'Cada 12 horas', '5 dias', 'Prequirurgico normal', 'Sin complicaciones', 'Castracion', '2025-02-26', 'Reposo 7 dias', 2),
+(40, 40, '2025-02-20', 'Consulta', 25.00, 'Tratamiento alergico', 'Ninguno', 'N/A', 'N/A', 'N/A', 'Examen dermatologico', 'Alergia alimentaria', 'Ninguno', '2025-03-20', 'Dieta hipoalergenica', 1),
+(41, 41, '2025-02-21', 'Consulta', 24.00, 'Revision anual', 'Ninguno', 'N/A', 'N/A', 'N/A', 'Examen fisico completo', 'Mascota saludable', 'Ninguno', '2026-02-21', 'Control anual', 1),
+(42, 42, '2025-02-22', 'Consulta', 1.50, 'Cuidados conejo', 'Ninguno', 'N/A', 'N/A', 'N/A', 'Examen fisico', 'Conejo sano', 'Ninguno', '2025-08-22', 'Dieta rica en fibra', 3),
+(43, 43, '2025-02-23', 'Cirugia', 26.00, 'Castracion', 'Analgesico', '2 ml', 'Cada 12 horas', '5 dias', 'Prequirurgico normal', 'Sin complicaciones', 'Castracion', '2025-02-28', 'Collar isabelino', 2),
+(44, 44, '2025-02-24', 'Diagnostico', 72.00, 'Manejo de displasia', 'Meloxicam', '7.5 mg', 'Cada 24 horas', '30 dias', 'Radiografia de cadera', 'Displasia moderada', 'Ninguno', '2025-03-24', 'Considerar fisioterapia', 11),
+(45, 45, '2025-02-25', 'Consulta', 4.90, 'Suplementacion', 'Aceite de pescado', '1 capsula', 'Cada 24 horas', '60 dias', 'Examen de piel', 'Deficiencia nutricional', 'Ninguno', '2025-04-25', 'Mejoria esperada', 1),
+(46, 46, '2025-02-26', 'Consulta', 60.00, 'Revision general', 'Ninguno', 'N/A', 'N/A', 'N/A', 'Examen fisico', 'Mascota saludable', 'Ninguno', '2025-08-26', 'Control semestral', 1),
+(47, 47, '2025-02-27', 'Consulta', 3.70, 'Inicio vacunacion', 'Ninguno', 'N/A', 'N/A', 'N/A', 'Examen fisico inicial', 'Gato saludable', 'Ninguno', '2025-03-20', 'Primera vacuna proxima visita', 1),
+(48, 48, '2025-02-28', 'Cirugia', 18.00, 'Esterilizacion', 'Antibiotico + Analgesico', '2 ml + 2 ml', 'Cada 12 horas', '14 dias', 'Prequirurgico normal', 'Cirugia exitosa', 'Ovariohisterectomia', '2025-03-14', 'Retiro de puntos dia 14', 2),
+(49, 49, '2025-03-01', 'Seguimiento', 18.00, 'Control postoperatorio', 'Ninguno', 'N/A', 'N/A', 'N/A', 'Revision de incision', 'Recuperacion adecuada', 'Ninguno', NULL, 'Alta medica', 1),
+(50, 50, '2025-03-02', 'Cirugia', 50.00, 'Castracion', 'Analgesico', '3 ml', 'Cada 12 horas', '5 dias', 'Prequirurgico normal', 'Sin complicaciones', 'Castracion', '2025-03-09', 'Collar isabelino 7 dias', 2);
+
+-- Insertar registro de vacunas (60 registros)
+INSERT INTO vacunas (mascota_id, nombre_vacuna, laboratorio, lote, fecha_aplicacion, fecha_vencimiento, proxima_dosis, empleado_aplica) VALUES
+(1, 'Vacuna Multiple Canina', 'Zoetis', 'LOT2025-001', '2024-01-15', '2026-01-15', '2025-01-15', 1),
+(2, 'Vacuna Triple Felina', 'Boehringer Ingelheim', 'LOT2025-002', '2025-01-15', '2027-01-15', '2026-01-15', 1),
+(3, 'Vacuna Antirrabica Canina', 'Virbac', 'LOT2025-003', '2024-02-20', '2026-02-20', '2025-02-20', 1),
+(4, 'Vacuna Antirrabica Felina', 'MSD', 'LOT2025-004', '2024-03-10', '2026-03-10', '2025-03-10', 2),
+(5, 'Vacuna Multiple Canina', 'Zoetis', 'LOT2025-005', '2023-05-15', '2025-05-15', NULL, 1),
+(7, 'Vacuna Multiple Canina', 'Boehringer Ingelheim', 'LOT2025-007', '2025-01-18', '2027-01-18', '2025-02-18', 1),
+(9, 'Vacuna Antirrabica Canina', 'Virbac', 'LOT2025-009', '2024-06-01', '2026-06-01', '2025-06-01', 2),
+(10, 'Vacuna Triple Felina', 'MSD', 'LOT2025-010', '2024-07-20', '2026-07-20', '2025-07-20', 1),
+(11, 'Vacuna Multiple Canina', 'Zoetis', 'LOT2025-011', '2024-08-15', '2026-08-15', '2025-08-15', 1),
+(14, 'Vacuna Antirrabica Canina', 'Virbac', 'LOT2025-014', '2024-09-10', '2026-09-10', '2025-09-10', 2),
+(15, 'Vacuna Triple Felina', 'Boehringer Ingelheim', 'LOT2025-015', '2024-10-05', '2026-10-05', '2025-10-05', 1),
+(16, 'Vacuna Multiple Canina', 'MSD', 'LOT2025-016', '2024-11-12', '2026-11-12', '2025-11-12', 1),
+(20, 'Vacuna Antirrabica Canina', 'Zoetis', 'LOT2025-020', '2025-01-29', '2027-01-29', '2026-01-29', 1),
+(22, 'Vacuna Multiple Canina', 'Virbac', 'LOT2025-022', '2024-03-05', '2026-03-05', '2025-03-05', 1),
+(24, 'Vacuna Triple Felina', 'MSD', 'LOT2025-024', '2024-04-10', '2026-04-10', '2025-04-10', 1),
+(26, 'Vacuna Antirrabica Canina', 'Boehringer Ingelheim', 'LOT2025-026', '2024-05-15', '2026-05-15', '2025-05-15', 2),
+(30, 'Vacuna Multiple Canina', 'Zoetis', 'LOT2025-030', '2025-02-10', '2027-02-10', '2025-03-03', 1),
+(32, 'Vacuna Triple Felina', 'Virbac', 'LOT2025-032', '2024-06-20', '2026-06-20', '2025-06-20', 3),
+(33, 'Vacuna Antirrabica Canina', 'MSD', 'LOT2025-033', '2025-02-13', '2027-02-13', '2026-02-13', 1),
+(36, 'Vacuna Multiple Canina', 'Boehringer Ingelheim', 'LOT2025-036', '2024-07-25', '2026-07-25', '2025-07-25', 1),
+(40, 'Vacuna Triple Felina', 'Zoetis', 'LOT2025-040', '2024-08-30', '2026-08-30', '2025-08-30', 1),
+(41, 'Vacuna Multiple Canina', 'Virbac', 'LOT2025-041', '2024-09-15', '2026-09-15', '2025-09-15', 1),
+(44, 'Vacuna Triple Felina', 'MSD', 'LOT2025-044', '2024-10-20', '2026-10-20', '2025-10-20', 1),
+(46, 'Vacuna Multiple Canina', 'Boehringer Ingelheim', 'LOT2025-046', '2024-11-25', '2026-11-25', '2025-11-25', 1),
+(48, 'Vacuna Antirrabica Canina', 'Zoetis', 'LOT2025-048', '2024-12-10', '2026-12-10', '2025-12-10', 2),
+(50, 'Vacuna Triple Felina', 'Virbac', 'LOT2025-050', '2024-01-05', '2026-01-05', '2025-01-05', 1),
+(52, 'Vacuna Multiple Canina', 'MSD', 'LOT2025-052', '2024-02-10', '2026-02-10', '2025-02-10', 1),
+(54, 'Vacuna Antirrabica Canina', 'Boehringer Ingelheim', 'LOT2025-054', '2024-03-15', '2026-03-15', '2025-03-15', 2),
+(56, 'Vacuna Triple Felina', 'Zoetis', 'LOT2025-056', '2024-04-20', '2026-04-20', '2025-04-20', 1),
+(58, 'Vacuna Multiple Canina', 'Virbac', 'LOT2025-058', '2024-05-25', '2026-05-25', '2025-05-25', 1),
+(60, 'Vacuna Antirrabica Canina', 'MSD', 'LOT2025-060', '2024-06-30', '2026-06-30', '2025-06-30', 1),
+(62, 'Vacuna Triple Felina', 'Boehringer Ingelheim', 'LOT2025-062', '2024-07-15', '2026-07-15', '2025-07-15', 2),
+(64, 'Vacuna Multiple Canina', 'Zoetis', 'LOT2025-064', '2024-08-20', '2026-08-20', '2025-08-20', 1),
+(66, 'Vacuna Antirrabica Canina', 'Virbac', 'LOT2025-066', '2024-09-25', '2026-09-25', '2025-09-25', 1),
+(68, 'Vacuna Triple Felina', 'MSD', 'LOT2025-068', '2024-10-30', '2026-10-30', '2025-10-30', 2),
+(70, 'Vacuna Multiple Canina', 'Boehringer Ingelheim', 'LOT2025-070', '2024-11-15', '2026-11-15', '2025-11-15', 1),
+(72, 'Vacuna Antirrabica Canina', 'Zoetis', 'LOT2025-072', '2024-12-20', '2026-12-20', '2025-12-20', 1),
+(74, 'Vacuna Triple Felina', 'Virbac', 'LOT2025-074', '2024-01-10', '2026-01-10', '2025-01-10', 1),
+(76, 'Vacuna Multiple Canina', 'MSD', 'LOT2025-076', '2024-02-15', '2026-02-15', '2025-02-15', 1),
+(78, 'Vacuna Antirrabica Canina', 'Boehringer Ingelheim', 'LOT2025-078', '2024-03-20', '2026-03-20', '2025-03-20', 1),
+(80, 'Vacuna Triple Felina', 'Zoetis', 'LOT2025-080', '2024-04-25', '2026-04-25', '2025-04-25', 1),
+(82, 'Vacuna Multiple Canina', 'Virbac', 'LOT2025-082', '2024-05-30', '2026-05-30', '2025-05-30', 1),
+(84, 'Vacuna Antirrabica Canina', 'MSD', 'LOT2025-084', '2024-06-15', '2026-06-15', '2025-06-15', 1),
+(86, 'Vacuna Triple Felina', 'Boehringer Ingelheim', 'LOT2025-086', '2024-07-20', '2026-07-20', '2025-07-20', 1),
+(88, 'Vacuna Multiple Canina', 'Zoetis', 'LOT2025-088', '2024-08-25', '2026-08-25', '2025-08-25', 1),
+(90, 'Vacuna Antirrabica Canina', 'Virbac', 'LOT2025-090', '2024-09-30', '2026-09-30', '2025-09-30', 1),
+(92, 'Vacuna Triple Felina', 'MSD', 'LOT2025-092', '2024-10-15', '2026-10-15', '2025-10-15', 1),
+(94, 'Vacuna Multiple Canina', 'Boehringer Ingelheim', 'LOT2025-094', '2024-11-20', '2026-11-20', '2025-11-20', 1),
+(96, 'Vacuna Antirrabica Canina', 'Zoetis', 'LOT2025-096', '2024-12-25', '2026-12-25', '2025-12-25', 1),
+(98, 'Vacuna Triple Felina', 'Virbac', 'LOT2025-098', '2024-01-30', '2026-01-30', '2025-01-30', 1),
+(100, 'Vacuna Multiple Canina', 'MSD', 'LOT2025-100', '2025-04-21', '2027-04-21', '2025-05-12', 1),
+(1, 'Vacuna Antirrabica Canina', 'Boehringer Ingelheim', 'LOT2025-101', '2025-02-15', '2027-02-15', '2026-02-15', 1),
+(6, 'Vacuna Triple Felina', 'Zoetis', 'LOT2025-106', '2025-03-01', '2027-03-01', '2026-03-01', 1),
+(12, 'Vacuna Multiple Canina', 'Virbac', 'LOT2025-112', '2025-03-10', '2027-03-10', '2026-03-10', 3),
+(18, 'Vacuna Antirrabica Canina', 'MSD', 'LOT2025-118', '2025-03-15', '2027-03-15', '2026-03-15', 1),
+(25, 'Vacuna Triple Felina', 'Boehringer Ingelheim', 'LOT2025-125', '2025-03-20', '2027-03-20', '2026-03-20', 1),
+(28, 'Vacuna Multiple Canina', 'Zoetis', 'LOT2025-128', '2025-03-25', '2027-03-25', '2026-03-25', 1),
+(35, 'Vacuna Antirrabica Canina', 'Virbac', 'LOT2025-135', '2025-03-30', '2027-03-30', '2026-03-30', 1),
+(42, 'Vacuna Triple Felina', 'MSD', 'LOT2025-142', '2025-04-05', '2027-04-05', '2026-04-05', 1),
+(55, 'Vacuna Multiple Canina', 'Boehringer Ingelheim', 'LOT2025-155', '2025-04-10', '2027-04-10', '2026-04-10', 1);
+
+-- Insertar 80 productos en inventario
+INSERT INTO inventario (codigo, nombre, descripcion, categoria, marca, presentacion, unidad_medida, stock_actual, stock_minimo, stock_maximo, precio_compra, precio_venta, proveedor_id, ubicacion_almacen, fecha_caducidad, requiere_receta) VALUES
+('MED-001', 'Amoxicilina 500mg', 'Antibiotico amplio espectro', 'Medicamento', 'Zoetis', 'Caja 100 tabletas', 'Caja', 50, 10, 100, 450.00, 900.00, 1, 'Estante A1', '2026-12-31', TRUE),
+('MED-002', 'Carprofeno 75mg', 'Analgesico antiinflamatorio', 'Medicamento', 'Pfizer', 'Frasco 60 tabletas', 'Frasco', 30, 10, 80, 520.00, 1040.00, 5, 'Estante A2', '2026-10-31', TRUE),
+('MED-003', 'Prednisona 5mg', 'Corticoide', 'Medicamento', 'Bayer', 'Frasco 100 tabletas', 'Frasco', 40, 10, 100, 380.00, 760.00, 5, 'Estante A3', '2026-08-31', TRUE),
+('MED-004', 'Meloxicam 1.5mg', 'Analgesico antiinflamatorio', 'Medicamento', 'Boehringer', 'Frasco 10ml', 'Frasco', 25, 5, 60, 180.00, 360.00, 7, 'Estante A4', '2026-11-30', TRUE),
+('MED-005', 'Enrofloxacina 50mg', 'Antibiotico fluoroquinolona', 'Medicamento', 'Bayer', 'Frasco 100ml', 'Frasco', 35, 10, 80, 420.00, 840.00, 5, 'Estante A5', '2026-09-30', TRUE),
+('MED-006', 'Enalapril 10mg', 'Antihipertensivo', 'Medicamento', 'MSD', 'Frasco 60 tabletas', 'Frasco', 20, 5, 50, 280.00, 560.00, 11, 'Estante A6', '2027-01-31', TRUE),
+('MED-007', 'Furosemida 40mg', 'Diuretico', 'Medicamento', 'Zoetis', 'Frasco 50 tabletas', 'Frasco', 18, 5, 40, 220.00, 440.00, 1, 'Estante A7', '2026-12-31', TRUE),
+('MED-008', 'Ivermectina 1%', 'Antiparasitario inyectable', 'Medicamento', 'Virbac', 'Frasco 50ml', 'Frasco', 45, 10, 100, 320.00, 640.00, 17, 'Estante B1', '2027-03-31', TRUE),
+('MED-009', 'Cefalexina 500mg', 'Antibiotico cefalosporina', 'Medicamento', 'Pfizer', 'Caja 100 capsulas', 'Caja', 28, 10, 70, 480.00, 960.00, 5, 'Estante B2', '2026-10-31', TRUE),
+('MED-010', 'Tramadol 50mg', 'Analgesico opioide', 'Medicamento', 'MSD', 'Frasco 100 capsulas', 'Frasco', 15, 5, 40, 550.00, 1100.00, 11, 'Estante B3', '2026-11-30', TRUE),
+('ALI-001', 'Royal Canin Adulto Perro', 'Alimento premium para perro adulto', 'Alimento', 'Royal Canin', 'Bulto 15kg', 'Bulto', 80, 20, 150, 950.00, 1400.00, 9, 'Bodega A', '2026-06-30', FALSE),
+('ALI-002', 'Hills Science Diet Gato', 'Alimento premium gato adulto', 'Alimento', 'Hills', 'Bulto 7kg', 'Bulto', 60, 15, 120, 780.00, 1200.00, 12, 'Bodega A', '2026-05-31', FALSE),
+('ALI-003', 'Pedigree Adulto Razas Medianas', 'Alimento economico perro', 'Alimento', 'Pedigree', 'Bulto 20kg', 'Bulto', 100, 25, 180, 650.00, 950.00, 15, 'Bodega B', '2026-07-31', FALSE),
+('ALI-004', 'Purina Dog Chow Cachorro', 'Alimento para cachorro', 'Alimento', 'Purina', 'Bulto 8kg', 'Bulto', 45, 10, 90, 520.00, 800.00, 6, 'Bodega B', '2026-08-31', FALSE),
+('ALI-005', 'Royal Canin Veterinary Gastrointestinal', 'Alimento terapeutico', 'Alimento', 'Royal Canin', 'Bulto 10kg', 'Bulto', 30, 8, 60, 1200.00, 1800.00, 9, 'Bodega C', '2026-09-30', FALSE),
+('ALI-006', 'Hills Prescription Diet c/d', 'Alimento urinario gatos', 'Alimento', 'Hills', 'Bulto 4kg', 'Bulto', 25, 5, 50, 850.00, 1300.00, 12, 'Bodega C', '2026-10-31', FALSE),
+('ALI-007', 'Pro Plan Sensitive Skin', 'Alimento para piel sensible', 'Alimento', 'Purina', 'Bulto 12kg', 'Bulto', 40, 10, 80, 980.00, 1500.00, 6, 'Bodega A', '2026-11-30', FALSE),
+('ALI-008', 'Royal Canin Mini Adulto', 'Alimento razas pequenas', 'Alimento', 'Royal Canin', 'Bulto 3kg', 'Bulto', 55, 12, 100, 450.00, 700.00, 9, 'Bodega A', '2026-12-31', FALSE),
+('ACC-001', 'Collar Antiparasitario Seresto', 'Collar 8 meses proteccion', 'Accesorio', 'Bayer', 'Pieza', 'Pieza', 150, 30, 250, 280.00, 450.00, 5, 'Estante C1', '2027-06-30', FALSE),
+('ACC-002', 'Pipeta Frontline Plus Perro', 'Pipeta antiparasitaria 20-40kg', 'Accesorio', 'Boehringer', 'Caja 3 pipetas', 'Caja', 80, 20, 150, 420.00, 650.00, 7, 'Estante C2', '2026-12-31', FALSE),
+('ACC-003', 'Pipeta Frontline Plus Gato', 'Pipeta antiparasitaria gatos', 'Accesorio', 'Boehringer', 'Caja 3 pipetas', 'Caja', 70, 15, 130, 400.00, 620.00, 7, 'Estante C3', '2026-12-31', FALSE),
+('ACC-004', 'Collar Isabelino Mediano', 'Collar protector postoperatorio', 'Accesorio', 'Generico', 'Pieza', 'Pieza', 45, 10, 80, 85.00, 150.00, 13, 'Estante C4', NULL, FALSE),
+('ACC-005', 'Correa Retractil 5m', 'Correa extensible para paseo', 'Accesorio', 'Flexi', 'Pieza', 'Pieza', 60, 15, 100, 180.00, 320.00, 4, 'Estante C5', NULL, FALSE),
+('ACC-006', 'Plato Comedero Acero Inoxidable', 'Plato para alimento', 'Accesorio', 'Kong', 'Pieza', 'Pieza', 90, 20, 150, 95.00, 180.00, 4, 'Estante D1', NULL, FALSE),
+('ACC-007', 'Juguete Kong Clasico Mediano', 'Juguete interactivo', 'Accesorio', 'Kong', 'Pieza', 'Pieza', 50, 10, 100, 120.00, 220.00, 4, 'Estante D2', NULL, FALSE),
+('ACC-008', 'Cama Ortopedica Grande', 'Cama con memoria para perros grandes', 'Accesorio', 'Pet Fusion', 'Pieza', 'Pieza', 20, 5, 40, 650.00, 1200.00, 4, 'Bodega D', NULL, FALSE),
+('HIG-001', 'Shampoo Medicado Ketoconazol', 'Shampoo antifungico', 'Higiene', 'Virbac', 'Frasco 500ml', 'Frasco', 40, 10, 80, 180.00, 320.00, 17, 'Estante E1', '2026-12-31', FALSE),
+('HIG-002', 'Shampoo Hipoalergenico', 'Shampoo para piel sensible', 'Higiene', 'Dermcare', 'Frasco 500ml', 'Frasco', 35, 8, 70, 150.00, 280.00, 16, 'Estante E2', '2027-01-31', FALSE),
+('HIG-003', 'Shampoo Antipulgas', 'Shampoo con permetrina', 'Higiene', 'Virbac', 'Frasco 500ml', 'Frasco', 45, 10, 90, 165.00, 300.00, 17, 'Estante E3', '2026-11-30', FALSE),
+('HIG-004', 'Limpiador de Oidos', 'Solucion otic limpieza', 'Higiene', 'Epi-Otic', 'Frasco 125ml', 'Frasco', 55, 12, 100, 120.00, 220.00, 17, 'Estante E4', '2027-02-28', FALSE),
+('HIG-005', 'Toallas Humedas Mascotas', 'Toallas con aloe vera', 'Higiene', 'Generico', 'Paquete 80 toallas', 'Paquete', 70, 15, 120, 45.00, 85.00, 8, 'Estante E5', '2026-09-30', FALSE),
+('HIG-006', 'Pasta Dental Enzimatica', 'Pasta dental sabor pollo', 'Higiene', 'Virbac', 'Tubo 70g', 'Tubo', 48, 10, 90, 95.00, 180.00, 17, 'Estante F1', '2027-03-31', FALSE),
+('HIG-007', 'Cepillo Dental Perro', 'Cepillo triple cabeza', 'Higiene', 'Generico', 'Pieza', 'Pieza', 65, 15, 120, 35.00, 70.00, 16, 'Estante F2', NULL, FALSE),
+('HIG-008', 'Desodorante Ambiental Mascotas', 'Eliminador de olores', 'Higiene', 'Nature Miracle', 'Spray 500ml', 'Spray', 42, 10, 80, 110.00, 200.00, 8, 'Estante F3', '2027-06-30', FALSE),
+('INS-001', 'Jeringas 3ml con Aguja', 'Jeringas desechables esteriles', 'Instrumental', 'BD', 'Caja 100 piezas', 'Caja', 25, 5, 50, 280.00, 450.00, 3, 'Gabinete A', '2028-12-31', FALSE),
+('INS-002', 'Jeringas 5ml con Aguja', 'Jeringas desechables esteriles', 'Instrumental', 'BD', 'Caja 100 piezas', 'Caja', 20, 5, 40, 320.00, 510.00, 3, 'Gabinete A', '2028-12-31', FALSE),
+('INS-003', 'Agujas Hipodermica 21G', 'Agujas esteriles', 'Instrumental', 'BD', 'Caja 100 piezas', 'Caja', 30, 10, 60, 180.00, 300.00, 3, 'Gabinete A', '2028-06-30', FALSE),
+('INS-004', 'Guantes Latex Caja M', 'Guantes examinacion latex', 'Instrumental', 'Sempermed', 'Caja 100 piezas', 'Caja', 50, 15, 100, 220.00, 380.00, 18, 'Gabinete B', '2027-12-31', FALSE),
+('INS-005', 'Guantes Nitrilo Caja L', 'Guantes sin latex', 'Instrumental', 'Sempermed', 'Caja 100 piezas', 'Caja', 45, 15, 90, 280.00, 480.00, 18, 'Gabinete B', '2027-12-31', FALSE),
+('INS-006', 'Bisturi Desechable No.15', 'Bisturi quirurgico esteril', 'Instrumental', 'Feather', 'Caja 100 piezas', 'Caja', 15, 5, 30, 450.00, 750.00, 10, 'Gabinete C', '2029-12-31', FALSE),
+('INS-007', 'Suturas Vicryl 3-0', 'Sutura absorbible', 'Instrumental', 'Ethicon', 'Caja 12 piezas', 'Caja', 8, 3, 20, 920.00, 1500.00, 18, 'Gabinete C', '2027-12-31', FALSE),
+('INS-008', 'Gasas Esteriles 10x10', 'Gasas quirurgicas', 'Instrumental', 'Generico', 'Paquete 100 piezas', 'Paquete', 60, 15, 120, 180.00, 320.00, 13, 'Gabinete D', '2028-12-31', FALSE),
+('INS-009', 'Vendaje Elastico 10cm', 'Venda cohesiva', 'Instrumental', 'Coban', 'Rollo', 'Rollo', 80, 20, 150, 45.00, 85.00, 18, 'Gabinete D', '2028-06-30', FALSE),
+('INS-010', 'Termometro Digital', 'Termometro rectal veterinario', 'Instrumental', 'Omron', 'Pieza', 'Pieza', 12, 3, 25, 180.00, 350.00, 18, 'Gabinete E', NULL, FALSE),
+('CON-001', 'Bolsas para Residuos Biologicos', 'Bolsas rojas 40x60cm', 'Consumible', 'Generico', 'Paquete 100 piezas', 'Paquete', 35, 10, 70, 120.00, 220.00, 13, 'Bodega E', NULL, FALSE),
+('CON-002', 'Papel Camilla Rollo', 'Papel protector desechable', 'Consumible', 'Generico', 'Rollo 80m', 'Rollo', 28, 8, 50, 95.00, 180.00, 13, 'Bodega E', NULL, FALSE),
+('CON-003', 'Alcohol Gel 1 Litro', 'Desinfectante manos', 'Consumible', 'Generico', 'Frasco 1 litro', 'Frasco', 40, 10, 80, 85.00, 150.00, 8, 'Bodega F', '2027-12-31', FALSE),
+('CON-004', 'Desinfectante Superficies 5L', 'Desinfectante cuaternario amonio', 'Consumible', 'Generico', 'Garrafa 5 litros', 'Garrafa', 18, 5, 35, 280.00, 480.00, 8, 'Bodega F', '2027-06-30', FALSE),
+('CON-005', 'Cubrebocas Tricapa Caja', 'Cubrebocas desechables', 'Consumible', 'Generico', 'Caja 50 piezas', 'Caja', 65, 15, 120, 120.00, 220.00, 13, 'Gabinete F', NULL, FALSE),
+('CON-006', 'Cateter Intravenoso 20G', 'Cateter IV esteril', 'Consumible', 'BD', 'Caja 50 piezas', 'Caja', 22, 5, 45, 420.00, 700.00, 3, 'Gabinete G', '2028-12-31', FALSE),
+('CON-007', 'Equipo Venoclisis Macrogotero', 'Equipo IV desechable', 'Consumible', 'Baxter', 'Caja 50 piezas', 'Caja', 18, 5, 40, 380.00, 650.00, 18, 'Gabinete G', '2028-06-30', FALSE),
+('CON-008', 'Solución Hartmann 1000ml', 'Solución electrolítica IV', 'Consumible', 'Pisa', 'Caja 12 frascos', 'Caja', 30, 8, 60, 420.00, 720.00, 18, 'Almacén Refrigerado', '2027-12-31', FALSE),
+('CON-009', 'Solución Salina 0.9% 500ml', 'Solución fisiológica', 'Consumible', 'Pisa', 'Caja 20 frascos', 'Caja', 35, 10, 70, 380.00, 650.00, 18, 'Almacén Refrigerado', '2027-12-31', FALSE),
+('CON-010', 'Campos Quirúrgicos Desechables', 'Campos estériles 90x90cm', 'Consumible', 'Generico', 'Paquete 10 piezas', 'Paquete', 25, 8, 50, 280.00, 480.00, 13, 'Gabinete H', '2028-12-31', FALSE),
+('MED-011', 'Doxiciclina 100mg', 'Antibiótico tetraciclina', 'Medicamento', 'Pfizer', 'Caja 100 tabletas', 'Caja', 32, 10, 70, 380.00, 760.00, 5, 'Estante B4', '2026-11-30', TRUE),
+('MED-012', 'Metronidazol 250mg', 'Antibiótico antiprotozoario', 'Medicamento', 'Bayer', 'Frasco 100 tabletas', 'Frasco', 28, 8, 60, 220.00, 440.00, 5, 'Estante B5', '2026-10-31', TRUE),
+('MED-013', 'Omeprazol 20mg', 'Inhibidor bomba protones', 'Medicamento', 'MSD', 'Frasco 60 capsulas', 'Frasco', 24, 8, 50, 280.00, 560.00, 11, 'Estante B6', '2027-01-31', TRUE),
+('MED-014', 'Ranitidina 150mg', 'Antagonista H2', 'Medicamento', 'Zoetis', 'Frasco 100 tabletas', 'Frasco', 22, 8, 45, 180.00, 360.00, 1, 'Estante B7', '2026-12-31', TRUE),
+('MED-015', 'Butorfanol 10mg/ml', 'Analgésico opiáceo inyectable', 'Medicamento', 'Zoetis', 'Frasco 10ml', 'Frasco', 12, 5, 30, 420.00, 840.00, 1, 'Estante C1', '2027-03-31', TRUE),
+('MED-016', 'Ketamina 100mg/ml', 'Anestésico disociativo', 'Medicamento', 'Pisa', 'Frasco 10ml', 'Frasco', 10, 3, 25, 380.00, 760.00, 18, 'Estante C2', '2027-06-30', TRUE),
+('MED-017', 'Xilazina 2%', 'Sedante analgésico', 'Medicamento', 'Pisa', 'Frasco 50ml', 'Frasco', 15, 5, 35, 320.00, 640.00, 18, 'Estante C3', '2027-04-30', TRUE),
+('MED-018', 'Atropina 1mg/ml', 'Anticolinérgico', 'Medicamento', 'Pisa', 'Ampolleta 1ml', 'Caja 25 amp', 18, 5, 40, 280.00, 560.00, 18, 'Estante C4', '2027-12-31', TRUE),
+('MED-019', 'Dexametasona 4mg/ml', 'Corticoide inyectable', 'Medicamento', 'Pisa', 'Frasco 10ml', 'Frasco', 20, 5, 45, 180.00, 360.00, 18, 'Estante C5', '2027-02-28', TRUE),
+('MED-020', 'Dipirona 500mg/ml', 'Analgésico antipirético', 'Medicamento', 'Pisa', 'Frasco 50ml', 'Frasco', 25, 8, 50, 220.00, 440.00, 18, 'Estante C6', '2027-01-31', TRUE),
+('ALI-009', 'Royal Canin Hepatic', 'Alimento terapéutico hepático', 'Alimento', 'Royal Canin', 'Bulto 10kg', 'Bulto', 15, 5, 35, 1350.00, 2100.00, 9, 'Bodega C', '2026-08-31', FALSE),
+('ALI-010', 'Hills k/d Renal', 'Alimento terapéutico renal', 'Alimento', 'Hills', 'Bulto 8.5kg', 'Bulto', 18, 5, 40, 1180.00, 1850.00, 12, 'Bodega C', '2026-09-30', FALSE),
+('ALI-011', 'Pro Plan Cachorro Raza Grande', 'Alimento cachorro razas grandes', 'Alimento', 'Purina', 'Bulto 15kg', 'Bulto', 35, 10, 70, 890.00, 1350.00, 6, 'Bodega A', '2026-10-31', FALSE),
+('ALI-012', 'Whiskas Adulto Atún', 'Alimento económico gato', 'Alimento', 'Whiskas', 'Bulto 10kg', 'Bulto', 55, 15, 100, 480.00, 720.00, 19, 'Bodega B', '2026-11-30', FALSE),
+('ALI-013', 'Royal Canin Persian', 'Alimento gatos persas', 'Alimento', 'Royal Canin', 'Bulto 4kg', 'Bulto', 28, 8, 55, 680.00, 1050.00, 9, 'Bodega A', '2026-12-31', FALSE),
+('ALI-014', 'Hills Metabolic Weight', 'Alimento control de peso', 'Alimento', 'Hills', 'Bulto 12kg', 'Bulto', 22, 6, 45, 1080.00, 1680.00, 12, 'Bodega C', '2027-01-31', FALSE),
+('ALI-015', 'Pedigree Cachorro', 'Alimento económico cachorro', 'Alimento', 'Pedigree', 'Bulto 10kg', 'Bulto', 48, 12, 90, 420.00, 650.00, 15, 'Bodega B', '2027-02-28', FALSE),
+('ACC-009', 'Transportadora Plástico Grande', 'Transportadora para perros grandes', 'Accesorio', 'Petmate', 'Pieza', 'Pieza', 15, 5, 30, 650.00, 1200.00, 4, 'Bodega D', NULL, FALSE),
+('ACC-010', 'Transportadora Gatos', 'Transportadora tamaño mediano', 'Accesorio', 'Petmate', 'Pieza', 'Pieza', 25, 8, 50, 380.00, 680.00, 4, 'Estante D3', NULL, FALSE),
+('ACC-011', 'Bebedero Automático', 'Bebedero con filtro', 'Accesorio', 'Catit', 'Pieza', 'Pieza', 18, 5, 40, 420.00, 750.00, 4, 'Estante D4', NULL, FALSE),
+('ACC-012', 'Arena Sanitaria Aglutinante 10kg', 'Arena para gatos', 'Accesorio', 'Tidy Cats', 'Bulto 10kg', 'Bulto', 65, 20, 120, 180.00, 320.00, 19, 'Bodega E', NULL, FALSE),
+('ACC-013', 'Pañales Para Perros M', 'Pañales desechables', 'Accesorio', 'Generico', 'Paquete 12 piezas', 'Paquete', 42, 10, 80, 95.00, 180.00, 13, 'Estante D5', NULL, FALSE),
+('ACC-014', 'Rascador Para Gatos', 'Poste rascador con juguetes', 'Accesorio', 'Kong', 'Pieza', 'Pieza', 22, 6, 45, 280.00, 520.00, 4, 'Bodega D', NULL, FALSE),
+('HIG-009', 'Acondicionador Para Perros', 'Acondicionador desenredante', 'Higiene', 'Dermcare', 'Frasco 500ml', 'Frasco', 32, 8, 65, 165.00, 300.00, 16, 'Estante E6', '2027-03-31', FALSE),
+('HIG-010', 'Cortauñas Guillotina Grande', 'Cortauñas para perros grandes', 'Higiene', 'Safari', 'Pieza', 'Pieza', 28, 8, 55, 120.00, 220.00, 16, 'Estante F4', NULL, FALSE),
+('HIG-011', 'Cortauñas Tijera Pequeño', 'Cortauñas gatos y perros pequeños', 'Higiene', 'Safari', 'Pieza', 'Pieza', 35, 10, 70, 85.00, 160.00, 16, 'Estante F5', NULL, FALSE),
+('HIG-012', 'Cepillo Quitapelo', 'Cepillo removedor de pelo muerto', 'Higiene', 'FURminator', 'Pieza', 'Pieza', 18, 5, 40, 320.00, 580.00, 16, 'Estante F6', NULL, FALSE);
+
+-- Insertar 100 movimientos de inventario
+INSERT INTO movimientos_inventario (producto_id, tipo_movimiento, cantidad, motivo, referencia, fecha_movimiento, empleado_id, costo_unitario, observaciones) VALUES
+(1, 'entrada', 100, 'Compra proveedor', 'OC-2025-001', '2025-01-05 10:00:00', 10, 450.00, 'Entrega completa'),
+(2, 'entrada', 60, 'Compra proveedor', 'OC-2025-002', '2025-01-05 10:30:00', 10, 520.00, 'Entrega completa'),
+(3, 'entrada', 80, 'Compra proveedor', 'OC-2025-003', '2025-01-05 11:00:00', 10, 380.00, 'Entrega completa'),
+(11, 'entrada', 150, 'Compra proveedor', 'OC-2025-004', '2025-01-06 09:00:00', 10, 950.00, 'Recepción almacén'),
+(12, 'entrada', 100, 'Compra proveedor', 'OC-2025-005', '2025-01-06 09:30:00', 10, 780.00, 'Recepción almacén'),
+(1, 'salida', 10, 'Dispensación consulta', 'CIT-2025-003', '2025-01-16 09:30:00', 1, 450.00, 'Tratamiento paciente ID 3'),
+(2, 'salida', 5, 'Dispensación consulta', 'CIT-2025-005', '2025-01-17 10:30:00', 2, 520.00, 'Tratamiento paciente ID 5'),
+(3, 'salida', 8, 'Dispensación consulta', 'CIT-2025-012', '2025-01-23 11:00:00', 1, 380.00, 'Tratamiento paciente ID 12'),
+(19, 'entrada', 80, 'Compra proveedor', 'OC-2025-006', '2025-01-07 10:00:00', 10, 280.00, 'Stock collar antiparasitario'),
+(20, 'entrada', 100, 'Compra proveedor', 'OC-2025-007', '2025-01-07 10:30:00', 10, 420.00, 'Stock pipetas perro'),
+(20, 'salida', 20, 'Venta mostrador', 'VTA-2025-001', '2025-01-08 14:00:00', 6, 420.00, 'Venta a clientes'),
+(11, 'salida', 15, 'Venta mostrador', 'VTA-2025-002', '2025-01-10 11:00:00', 6, 950.00, 'Venta bultos alimento'),
+(4, 'entrada', 50, 'Compra proveedor', 'OC-2025-008', '2025-01-12 09:00:00', 10, 180.00, 'Reposición stock'),
+(5, 'entrada', 60, 'Compra proveedor', 'OC-2025-009', '2025-01-12 09:30:00', 10, 420.00, 'Reposición stock'),
+(27, 'entrada', 50, 'Compra proveedor', 'OC-2025-010', '2025-01-15 10:00:00', 10, 180.00, 'Stock shampoo medicado'),
+(28, 'entrada', 45, 'Compra proveedor', 'OC-2025-011', '2025-01-15 10:30:00', 10, 150.00, 'Stock shampoo hipoalergénico'),
+(16, 'salida', 2, 'Uso en cirugía', 'CIT-2025-009', '2025-01-20 09:00:00', 2, 380.00, 'Esterilización paciente ID 9'),
+(27, 'salida', 10, 'Uso en baños', 'EST-2025-001', '2025-01-26 11:00:00', 8, 180.00, 'Servicios de estética'),
+(35, 'entrada', 40, 'Compra proveedor', 'OC-2025-012', '2025-01-18 09:00:00', 10, 280.00, 'Stock jeringas 3ml'),
+(36, 'entrada', 30, 'Compra proveedor', 'OC-2025-013', '2025-01-18 09:30:00', 10, 320.00, 'Stock jeringas 5ml'),
+(35, 'salida', 15, 'Uso en consultas', 'USO-2025-001', '2025-01-22 17:00:00', 4, 280.00, 'Consumo mensual consultas'),
+(38, 'entrada', 80, 'Compra proveedor', 'OC-2025-014', '2025-01-20 10:00:00', 10, 220.00, 'Stock guantes látex'),
+(39, 'entrada', 70, 'Compra proveedor', 'OC-2025-015', '2025-01-20 10:30:00', 10, 280.00, 'Stock guantes nitrilo'),
+(38, 'salida', 30, 'Uso en consultas', 'USO-2025-002', '2025-01-31 17:00:00', 4, 220.00, 'Consumo mensual'),
+(11, 'salida', 20, 'Venta mostrador', 'VTA-2025-003', '2025-02-01 10:00:00', 6, 950.00, 'Venta alimento premium'),
+(12, 'salida', 15, 'Venta mostrador', 'VTA-2025-004', '2025-02-01 11:00:00', 6, 780.00, 'Venta alimento gatos'),
+(13, 'entrada', 120, 'Compra proveedor', 'OC-2025-016', '2025-02-03 09:00:00', 10, 650.00, 'Reposición alimento económico'),
+(14, 'entrada', 60, 'Compra proveedor', 'OC-2025-017', '2025-02-03 10:00:00', 10, 520.00, 'Stock alimento cachorro'),
+(13, 'salida', 20, 'Venta mostrador', 'VTA-2025-005', '2025-02-05 14:00:00', 7, 650.00, 'Venta cliente regular'),
+(2, 'salida', 10, 'Dispensación consulta', 'CIT-2025-028', '2025-02-08 11:00:00', 11, 520.00, 'Tratamiento displasia'),
+(6, 'entrada', 35, 'Compra proveedor', 'OC-2025-018', '2025-02-10 09:00:00', 10, 280.00, 'Stock medicamento cardíaco'),
+(7, 'entrada', 30, 'Compra proveedor', 'OC-2025-019', '2025-02-10 09:30:00', 10, 220.00, 'Stock diurético'),
+(6, 'salida', 5, 'Dispensación consulta', 'CIT-2025-037', '2025-02-17 12:00:00', 1, 280.00, 'Tratamiento cardíaco'),
+(19, 'salida', 30, 'Venta mostrador', 'VTA-2025-006', '2025-02-12 10:00:00', 6, 280.00, 'Venta collares antiparasitarios'),
+(21, 'entrada', 90, 'Compra proveedor', 'OC-2025-020', '2025-02-14 10:00:00', 10, 400.00, 'Stock pipetas gatos'),
+(21, 'salida', 20, 'Venta mostrador', 'VTA-2025-007', '2025-02-16 11:00:00', 6, 400.00, 'Venta pipetas felinas'),
+(40, 'entrada', 25, 'Compra proveedor', 'OC-2025-021', '2025-02-18 09:00:00', 10, 180.00, 'Stock bisturí desechable'),
+(41, 'entrada', 12, 'Compra proveedor', 'OC-2025-022', '2025-02-18 10:00:00', 10, 920.00, 'Stock suturas'),
+(40, 'salida', 10, 'Uso en cirugías', 'USO-2025-003', '2025-02-28 17:00:00', 2, 180.00, 'Consumo cirugías del mes'),
+(41, 'salida', 4, 'Uso en cirugías', 'USO-2025-004', '2025-02-28 17:00:00', 2, 920.00, 'Consumo suturas'),
+(8, 'entrada', 70, 'Compra proveedor', 'OC-2025-023', '2025-02-20 09:00:00', 10, 320.00, 'Stock antiparasitario inyectable'),
+(8, 'salida', 25, 'Dispensación consultas', 'USO-2025-005', '2025-02-28 17:00:00', 1, 320.00, 'Tratamientos antiparasitarios'),
+(11, 'salida', 25, 'Venta mostrador', 'VTA-2025-008', '2025-03-01 10:00:00', 6, 950.00, 'Venta alimento premium'),
+(14, 'salida', 15, 'Venta mostrador', 'VTA-2025-009', '2025-03-02 11:00:00', 6, 520.00, 'Venta alimento cachorro'),
+(27, 'salida', 8, 'Uso en baños', 'EST-2025-002', '2025-03-05 14:00:00', 8, 180.00, 'Servicios de estética'),
+(28, 'salida', 10, 'Uso en baños', 'EST-2025-003', '2025-03-05 14:30:00', 8, 150.00, 'Baños hipoalergénicos'),
+(42, 'entrada', 80, 'Compra proveedor', 'OC-2025-024', '2025-03-08 09:00:00', 10, 180.00, 'Stock gasas estériles'),
+(43, 'entrada', 100, 'Compra proveedor', 'OC-2025-025', '2025-03-08 10:00:00', 10, 45.00, 'Stock vendaje elástico'),
+(42, 'salida', 20, 'Uso en consultas', 'USO-2025-006', '2025-03-31 17:00:00', 4, 180.00, 'Consumo gasas del mes'),
+(9, 'entrada', 50, 'Compra proveedor', 'OC-2025-026', '2025-03-10 09:00:00', 10, 480.00, 'Stock cefalexina'),
+(10, 'entrada', 25, 'Compra proveedor', 'OC-2025-027', '2025-03-10 10:00:00', 10, 550.00, 'Stock tramadol'),
+(10, 'salida', 10, 'Dispensación consulta', 'CIT-2025-056', '2025-03-08 11:00:00', 1, 550.00, 'Tratamiento dolor'),
+(15, 'entrada', 40, 'Compra proveedor', 'OC-2025-028', '2025-03-12 09:00:00', 10, 450.00, 'Stock alimento terapéutico'),
+(16, 'entrada', 35, 'Compra proveedor', 'OC-2025-029', '2025-03-12 10:00:00', 10, 850.00, 'Stock alimento urinario'),
+(15, 'salida', 10, 'Venta receta', 'VTA-2025-010', '2025-03-15 11:00:00', 6, 450.00, 'Alimento prescripción veterinaria'),
+(19, 'salida', 20, 'Venta mostrador', 'VTA-2025-011', '2025-03-18 10:00:00', 6, 280.00, 'Venta collares'),
+(20, 'salida', 15, 'Venta mostrador', 'VTA-2025-012', '2025-03-18 11:00:00', 6, 420.00, 'Venta pipetas perro'),
+(35, 'salida', 12, 'Uso en consultas', 'USO-2025-007', '2025-03-31 17:00:00', 4, 280.00, 'Consumo jeringas'),
+(38, 'salida', 25, 'Uso en consultas', 'USO-2025-008', '2025-03-31 17:00:00', 4, 220.00, 'Consumo guantes'),
+(11, 'entrada', 100, 'Compra proveedor', 'OC-2025-030', '2025-04-01 09:00:00', 10, 950.00, 'Reposición stock'),
+(12, 'entrada', 80, 'Compra proveedor', 'OC-2025-031', '2025-04-01 10:00:00', 10, 780.00, 'Reposición stock'),
+(11, 'salida', 30, 'Venta mostrador', 'VTA-2025-013', '2025-04-05 10:00:00', 6, 950.00, 'Venta alimento'),
+(12, 'salida', 20, 'Venta mostrador', 'VTA-2025-014', '2025-04-05 11:00:00', 6, 780.00, 'Venta alimento gatos'),
+(1, 'entrada', 60, 'Compra proveedor', 'OC-2025-032', '2025-04-08 09:00:00', 10, 450.00, 'Reposición antibiótico'),
+(2, 'entrada', 40, 'Compra proveedor', 'OC-2025-033', '2025-04-08 10:00:00', 10, 520.00, 'Reposición analgésico'),
+(1, 'salida', 12, 'Dispensación consultas', 'USO-2025-009', '2025-04-30 17:00:00', 1, 450.00, 'Tratamientos del mes'),
+(2, 'salida', 8, 'Dispensación consultas', 'USO-2025-010', '2025-04-30 17:00:00', 1, 520.00, 'Tratamientos del mes'),
+(27, 'salida', 12, 'Uso en baños', 'EST-2025-004', '2025-04-10 14:00:00', 8, 180.00, 'Servicios de estética'),
+(29, 'entrada', 60, 'Compra proveedor', 'OC-2025-034', '2025-04-12 09:00:00', 10, 165.00, 'Stock shampoo antipulgas'),
+(29, 'salida', 15, 'Uso en baños', 'EST-2025-005', '2025-04-15 14:00:00', 8, 165.00, 'Baños antipulgas'),
+(13, 'salida', 25, 'Venta mostrador', 'VTA-2025-015', '2025-04-18 10:00:00', 7, 650.00, 'Venta alimento'),
+(14, 'salida', 18, 'Venta mostrador', 'VTA-2025-016', '2025-04-18 11:00:00', 7, 520.00, 'Venta alimento cachorro'),
+(22, 'entrada', 70, 'Compra proveedor', 'OC-2025-035', '2025-04-20 09:00:00', 10, 85.00, 'Stock collar isabelino'),
+(23, 'entrada', 80, 'Compra proveedor', 'OC-2025-036', '2025-04-20 10:00:00', 10, 180.00, 'Stock correas retráctiles'),
+(22, 'salida', 25, 'Venta y uso quirúrgico', 'USO-2025-011', '2025-04-30 17:00:00', 2, 85.00, 'Uso postoperatorio'),
+(35, 'salida', 10, 'Uso en consultas', 'USO-2025-012', '2025-04-30 17:00:00', 4, 280.00, 'Consumo jeringas'),
+(36, 'salida', 8, 'Uso en consultas', 'USO-2025-013', '2025-04-30 17:00:00', 4, 320.00, 'Consumo jeringas 5ml'),
+(38, 'salida', 20, 'Uso en consultas', 'USO-2025-014', '2025-04-30 17:00:00', 4, 220.00, 'Consumo guantes látex'),
+(39, 'salida', 15, 'Uso en consultas', 'USO-2025-015', '2025-04-30 17:00:00', 4, 280.00, 'Consumo guantes nitrilo'),
+(3, 'salida', 10, 'Dispensación consultas', 'USO-2025-016', '2025-04-30 17:00:00', 1, 380.00, 'Tratamientos del mes'),
+(4, 'salida', 8, 'Dispensación consultas', 'USO-2025-017', '2025-04-30 17:00:00', 1, 180.00, 'Tratamientos del mes'),
+(30, 'entrada', 70, 'Compra proveedor', 'OC-2025-037', '2025-05-02 09:00:00', 10, 120.00, 'Stock limpiador de oídos'),
+(31, 'entrada', 90, 'Compra proveedor', 'OC-2025-038', '2025-05-02 10:00:00', 10, 45.00, 'Stock toallas húmedas'),
+(30, 'salida', 15, 'Uso en consultas', 'USO-2025-018', '2025-05-31 17:00:00', 4, 120.00, 'Limpiezas auriculares'),
+(31, 'salida', 20, 'Venta mostrador', 'VTA-2025-017', '2025-05-10 11:00:00', 6, 45.00, 'Venta toallas húmedas'),
+(11, 'salida', 28, 'Venta mostrador', 'VTA-2025-018', '2025-05-15 10:00:00', 6, 950.00, 'Venta alimento premium'),
+(12, 'salida', 22, 'Venta mostrador', 'VTA-2025-019', '2025-05-15 11:00:00', 6, 780.00, 'Venta alimento gatos'),
+(5, 'salida', 12, 'Dispensación consultas', 'USO-2025-019', '2025-05-31 17:00:00', 1, 420.00, 'Tratamientos antibióticos'),
+(17, 'entrada', 60, 'Compra proveedor', 'OC-2025-039', '2025-05-20 09:00:00', 10, 980.00, 'Stock alimento piel sensible'),
+(18, 'entrada', 75, 'Compra proveedor', 'OC-2025-040', '2025-05-20 10:00:00', 10, 450.00, 'Stock alimento razas pequeñas'),
+(17, 'salida', 20, 'Venta mostrador', 'VTA-2025-020', '2025-05-25 11:00:00', 6, 980.00, 'Alimento prescripción'),
+(24, 'entrada', 120, 'Compra proveedor', 'OC-2025-041', '2025-06-01 09:00:00', 10, 95.00, 'Stock platos comedero'),
+(25, 'entrada', 80, 'Compra proveedor', 'OC-2025-042', '2025-06-01 10:00:00', 10, 120.00, 'Stock juguetes Kong'),
+(24, 'salida', 30, 'Venta mostrador', 'VTA-2025-021', '2025-06-05 10:00:00', 6, 95.00, 'Venta accesorios'),
+(25, 'salida', 30, 'Venta mostrador', 'VTA-2025-022', '2025-06-05 11:00:00', 6, 120.00, 'Venta juguetes');
+
+-- Insertar 50 ventas
+INSERT INTO ventas (folio, dueno_id, fecha_venta, subtotal, descuento, iva, total, metodo_pago, estado, empleado_vendedor, observaciones) VALUES
+('VTA-2025-001', 5, '2025-01-08 14:00:00', 1300.00, 0.00, 208.00, 1508.00, 'tarjeta', 'pagada', 6, 'Venta pipetas antiparasitarias'),
+('VTA-2025-002', 10, '2025-01-10 11:00:00', 2850.00, 0.00, 456.00, 3306.00, 'efectivo', 'pagada', 6, 'Venta bultos de alimento'),
+('VTA-2025-003', 15, '2025-02-01 10:00:00', 2800.00, 420.00, 380.80, 2760.80, 'tarjeta', 'pagada', 6, 'Descuento cliente VIP'),
+('VTA-2025-004', 20, '2025-02-01 11:00:00', 2400.00, 0.00, 384.00, 2784.00, 'efectivo', 'pagada', 6, 'Venta alimento gatos'),
+('VTA-2025-005', 8, '2025-02-05 14:00:00', 1900.00, 190.00, 273.60, 1983.60, 'transferencia', 'pagada', 7, 'Descuento cliente premium'),
+('VTA-2025-006', 12, '2025-02-12 10:00:00', 1350.00, 135.00, 194.40, 1409.40, 'tarjeta', 'pagada', 6, 'Descuento cliente premium'),
+('VTA-2025-007', 18, '2025-02-16 11:00:00', 1240.00, 0.00, 198.40, 1438.40, 'efectivo', 'pagada', 6, 'Venta pipetas felinas'),
+('VTA-2025-008', 22, '2025-03-01 10:00:00', 3500.00, 0.00, 560.00, 4060.00, 'tarjeta', 'pagada', 6, 'Venta alimento premium'),
+('VTA-2025-009', 25, '2025-03-02 11:00:00', 2400.00, 360.00, 326.40, 2366.40, 'efectivo', 'pagada', 6, 'Descuento cliente VIP'),
+('VTA-2025-010', 28, '2025-03-15 11:00:00', 3150.00, 0.00, 504.00, 3654.00, 'transferencia', 'pagada', 6, 'Alimento prescripción veterinaria'),
+('VTA-2025-011', 30, '2025-03-18 10:00:00', 900.00, 0.00, 144.00, 1044.00, 'efectivo', 'pagada', 6, 'Venta collares antiparasitarios'),
+('VTA-2025-012', 32, '2025-03-18 11:00:00', 1950.00, 0.00, 312.00, 2262.00, 'tarjeta', 'pagada', 6, 'Venta pipetas perro'),
+('VTA-2025-013', 35, '2025-04-05 10:00:00', 4200.00, 0.00, 672.00, 4872.00, 'tarjeta', 'pagada', 6, 'Venta alimento bultos'),
+('VTA-2025-014', 38, '2025-04-05 11:00:00', 2400.00, 240.00, 345.60, 2505.60, 'efectivo', 'pagada', 6, 'Descuento cliente premium'),
+('VTA-2025-015', 2, '2025-04-18 10:00:00', 2375.00, 0.00, 380.00, 2755.00, 'transferencia', 'pagada', 7, 'Venta alimento económico'),
+('VTA-2025-016', 7, '2025-04-18 11:00:00', 2340.00, 0.00, 374.40, 2714.40, 'efectivo', 'pagada', 7, 'Venta alimento cachorro'),
+('VTA-2025-017', 11, '2025-05-10 11:00:00', 170.00, 0.00, 27.20, 197.20, 'efectivo', 'pagada', 6, 'Venta toallas húmedas'),
+('VTA-2025-018', 14, '2025-05-15 10:00:00', 3920.00, 0.00, 627.20, 4547.20, 'tarjeta', 'pagada', 6, 'Venta alimento premium'),
+('VTA-2025-019', 16, '2025-05-15 11:00:00', 2640.00, 264.00, 380.16, 2756.16, 'efectivo', 'pagada', 6, 'Descuento cliente premium'),
+('VTA-2025-020', 19, '2025-05-25 11:00:00', 3000.00, 450.00, 408.00, 2958.00, 'transferencia', 'pagada', 6, 'Descuento cliente VIP'),
+('VTA-2025-021', 23, '2025-06-05 10:00:00', 540.00, 0.00, 86.40, 626.40, 'efectivo', 'pagada', 6, 'Venta accesorios'),
+('VTA-2025-022', 26, '2025-06-05 11:00:00', 660.00, 99.00, 89.76, 650.76, 'tarjeta', 'pagada', 6, 'Descuento cliente VIP'),
+('VTA-2025-023', 1, '2025-06-10 10:00:00', 1400.00, 140.00, 201.60, 1461.60, 'efectivo', 'pagada', 6, 'Descuento cliente premium'),
+('VTA-2025-024', 4, '2025-06-12 11:00:00', 2100.00, 0.00, 336.00, 2436.00, 'tarjeta', 'pagada', 6, 'Venta alimento'),
+('VTA-2025-025', 6, '2025-06-15 10:00:00', 1560.00, 156.00, 224.64, 1628.64, 'transferencia', 'pagada', 6, 'Descuento cliente premium'),
+('VTA-2025-026', 9, '2025-06-18 11:00:00', 1800.00, 270.00, 244.80, 1774.80, 'efectivo', 'pagada', 6, 'Descuento cliente VIP'),
+('VTA-2025-027', 13, '2025-06-20 10:00:00', 950.00, 0.00, 152.00, 1102.00, 'tarjeta', 'pagada', 7, 'Venta alimento'),
+('VTA-2025-028', 17, '2025-06-22 11:00:00', 1450.00, 0.00, 232.00, 1682.00, 'efectivo', 'pagada', 7, 'Venta pipetas'),
+('VTA-2025-029', 21, '2025-06-25 10:00:00', 2800.00, 0.00, 448.00, 3248.00, 'tarjeta', 'pagada', 6, 'Venta alimento premium'),
+('VTA-2025-030', 24, '2025-06-28 11:00:00', 1680.00, 0.00, 268.80, 1948.80, 'transferencia', 'pagada', 6, 'Venta alimento terapéutico'),
+('VTA-2025-031', 27, '2025-07-01 10:00:00', 3150.00, 472.50, 428.40, 3105.90, 'efectivo', 'pagada', 6, 'Descuento cliente VIP'),
+('VTA-2025-032', 29, '2025-07-05 11:00:00', 800.00, 0.00, 128.00, 928.00, 'tarjeta', 'pagada', 6, 'Venta accesorios'),
+('VTA-2025-033', 31, '2025-07-08 10:00:00', 2250.00, 337.50, 306.00, 2218.50, 'efectivo', 'pagada', 6, 'Descuento cliente VIP'),
+('VTA-2025-034', 33, '2025-07-10 11:00:00', 1920.00, 0.00, 307.20, 2227.20, 'transferencia', 'pagada', 6, 'Venta alimento'),
+('VTA-2025-035', 34, '2025-07-12 10:00:00', 1400.00, 140.00, 201.60, 1461.60, 'tarjeta', 'pagada', 6, 'Descuento cliente premium'),
+('VTA-2025-036', 36, '2025-07-15 11:00:00', 2100.00, 315.00, 285.60, 2070.60, 'efectivo', 'pagada', 6, 'Descuento cliente VIP'),
+('VTA-2025-037', 37, '2025-07-18 10:00:00', 960.00, 96.00, 138.24, 1002.24, 'tarjeta', 'pagada', 6, 'Descuento cliente premium'),
+('VTA-2025-038', 39, '2025-07-20 11:00:00', 1500.00, 0.00, 240.00, 1740.00, 'efectivo', 'pagada', 7, 'Venta alimento'),
+('VTA-2025-039', 40, '2025-07-22 10:00:00', 1850.00, 0.00, 296.00, 2146.00, 'transferencia', 'pagada', 7, 'Venta productos varios'),
+('VTA-2025-040', 41, '2025-07-25 11:00:00', 2240.00, 0.00, 358.40, 2598.40, 'tarjeta', 'pagada', 6, 'Venta alimento y accesorios'),
+('VTA-2025-041', 42, '2025-07-28 10:00:00', 1680.00, 252.00, 228.48, 1656.48, 'efectivo', 'pagada', 6, 'Descuento cliente VIP'),
+('VTA-2025-042', 43, '2025-08-01 11:00:00', 3200.00, 0.00, 512.00, 3712.00, 'tarjeta', 'pagada', 6, 'Venta bultos de alimento'),
+('VTA-2025-043', 44, '2025-08-05 10:00:00', 1450.00, 0.00, 232.00, 1682.00, 'transferencia', 'pagada', 6, 'Venta alimento'),
+('VTA-2025-044', 45, '2025-08-08 11:00:00', 2100.00, 315.00, 285.60, 2070.60, 'efectivo', 'pagada', 6, 'Descuento cliente VIP'),
+('VTA-2025-045', 46, '2025-08-10 10:00:00', 1750.00, 175.00, 252.00, 1827.00, 'tarjeta', 'pagada', 6, 'Descuento cliente premium'),
+('VTA-2025-046', 47, '2025-08-12 11:00:00', 980.00, 0.00, 156.80, 1136.80, 'efectivo', 'pagada', 7, 'Venta productos higiene'),
+('VTA-2025-047', 48, '2025-08-15 10:00:00', 2400.00, 0.00, 384.00, 2784.00, 'transferencia', 'pagada', 7, 'Venta alimento premium'),
+('VTA-2025-048', 49, '2025-08-18 11:00:00', 1320.00, 0.00, 211.20, 1531.20, 'tarjeta', 'pagada', 6, 'Venta accesorios'),
+('VTA-2025-049', 50, '2025-08-20 10:00:00', 2850.00, 427.50, 387.60, 2810.10, 'efectivo', 'pagada', 6, 'Descuento cliente VIP'),
+('VTA-2025-050', 3, '2025-08-22 11:00:00', 1900.00, 285.00, 258.40, 1873.40, 'tarjeta', 'pagada', 6, 'Descuento cliente VIP');
+
+-- Insertar detalles de ventas (150 registros - 3 productos promedio por venta)
+INSERT INTO detalle_ventas (venta_id, producto_id, cantidad, precio_unitario, descuento, subtotal) VALUES
+(1, 20, 2, 650.00, 0.00, 1300.00),
+(2, 11, 2, 1400.00, 0.00, 2800.00),
+(2, 19, 1, 450.00, 0.00, 450.00),
+(2, 30, 2, 220.00, 0.00, 440.00),
+(3, 11, 2, 1400.00, 420.00, 2380.00),
+(4, 12, 2, 1200.00, 0.00, 2400.00),
+(5, 13, 2, 950.00, 190.00, 1710.00),
+(6, 19, 3, 450.00, 135.00, 1215.00),
+(7, 21, 2, 620.00, 0.00, 1240.00),
+(8, 11, 2, 1400.00, 0.00, 2800.00),
+(8, 17, 1, 1500.00, 0.00, 1500.00),
+(9, 14, 3, 800.00, 360.00, 2040.00),
+(10, 15, 3, 2100.00, 0.00, 6300.00),
+(11, 19, 2, 450.00, 0.00, 900.00),
+(12, 20, 3, 650.00, 0.00, 1950.00),
+(13, 11, 3, 1400.00, 0.00, 4200.00),
+(14, 12, 2, 1200.00, 240.00, 2160.00),
+(15, 13, 5, 950.00, 0.00, 4750.00),
+(16, 14, 3, 800.00, 0.00, 2400.00),
+(17, 31, 2, 85.00, 0.00, 170.00),
+(18, 11, 2, 1400.00, 0.00, 2800.00),
+(18, 17, 1, 1500.00, 0.00, 1500.00),
+(18, 30, 3, 220.00, 0.00, 660.00),
+(19, 12, 2, 1200.00, 240.00, 2160.00),
+(19, 19, 1, 450.00, 45.00, 405.00),
+(20, 17, 2, 1500.00, 450.00, 2550.00),
+(21, 24, 3, 180.00, 0.00, 540.00),
+(22, 25, 3, 220.00, 66.00, 594.00),
+(23, 11, 1, 1400.00, 140.00, 1260.00),
+(24, 13, 3, 950.00, 0.00, 2850.00),
+(25, 14, 2, 800.00, 160.00, 1440.00),
+(26, 17, 1, 1500.00, 225.00, 1275.00),
+(26, 19, 1, 450.00, 67.50, 382.50),
+(27, 13, 1, 950.00, 0.00, 950.00),
+(28, 20, 2, 650.00, 0.00, 1300.00),
+(28, 30, 1, 220.00, 0.00, 220.00),
+(29, 11, 2, 1400.00, 0.00, 2800.00),
+(30, 15, 1, 2100.00, 0.00, 2100.00),
+(31, 11, 2, 1400.00, 420.00, 2380.00),
+(31, 17, 1, 1500.00, 225.00, 1275.00),
+(32, 23, 2, 320.00, 0.00, 640.00),
+(32, 30, 1, 220.00, 0.00, 220.00),
+(33, 17, 1, 1500.00, 225.00, 1275.00),
+(33, 19, 2, 450.00, 135.00, 765.00),
+(34, 12, 2, 1200.00, 0.00, 2400.00),
+(35, 11, 1, 1400.00, 140.00, 1260.00),
+(36, 17, 1, 1500.00, 225.00, 1275.00),
+(36, 19, 2, 450.00, 135.00, 765.00),
+(37, 12, 1, 1200.00, 120.00, 1080.00),
+(38, 13, 2, 950.00, 0.00, 1900.00),
+(39, 14, 3, 800.00, 0.00, 2400.00),
+(40, 11, 2, 1400.00, 0.00, 2800.00),
+(41, 17, 1, 1500.00, 225.00, 1275.00),
+(41, 19, 1, 450.00, 67.50, 382.50),
+(42, 11, 3, 1400.00, 0.00, 4200.00),
+(43, 14, 2, 800.00, 0.00, 1600.00),
+(44, 17, 1, 1500.00, 225.00, 1275.00),
+(44, 19, 2, 450.00, 135.00, 765.00),
+(45, 11, 1, 1400.00, 140.00, 1260.00),
+(45, 19, 1, 450.00, 45.00, 405.00),
+(46, 27, 5, 320.00, 0.00, 1600.00),
+(47, 11, 2, 1400.00, 0.00, 2800.00),
+(48, 22, 8, 150.00, 0.00, 1200.00),
+(48, 30, 1, 220.00, 0.00, 220.00),
+(49, 11, 2, 1400.00, 420.00, 2380.00),
+(49, 19, 1, 450.00, 67.50, 382.50),
+(50, 17, 1, 1500.00, 225.00, 1275.00),
+(50, 19, 1, 450.00, 67.50, 382.50);
+
+-- Insertar 10 registros de hospitalización
+INSERT INTO hospitalizacion (mascota_id, fecha_ingreso, fecha_salida, motivo, jaula_numero, estado, costo_diario, empleado_responsable, observaciones_ingreso, observaciones_salida) VALUES
+(28, '2025-02-08 08:00:00', '2025-02-11 10:00:00', 'Postoperatorio displasia de cadera', 'J-01', 'alta', 800.00, 11, 'Paciente requiere monitoreo dolor y movilidad', 'Alta satisfactoria, continuar tratamiento en casa'),
+(66, '2025-03-18 14:00:00', '2025-03-21 09:00:00', 'Monitoreo cardiaco intensivo', 'J-02', 'alta', 1500.00, 15, 'Cardiomiopatía descompensada, requiere cuidados intensivos', 'Estabilizado, medicación ajustada'),
+(76, '2025-03-28 16:00:00', '2025-04-02 11:00:00', 'Manejo dolor severo displasia', 'J-01', 'alta', 800.00, 1, 'Dolor no controlado ambulatoriamente', 'Control de dolor exitoso, alta con analgésicos'),
+(5, '2025-05-10 10:00:00', '2025-05-13 08:00:00', 'Complicación postquirúrgica', 'J-03', 'alta', 800.00, 2, 'Inflamación excesiva en sitio de cirugía', 'Resolución satisfactoria, antibióticos completados'),
+(78, '2025-06-15 13:00:00', '2025-06-18 09:00:00', 'Observación trauma abdominal', 'J-02', 'alta', 800.00, 1, 'Atropellamiento vehicular, requiere observación', 'Sin daño orgánico, alta con reposo'),
+(50, '2025-07-20 09:00:00', '2025-07-24 10:00:00', 'Parvovirosis severa', 'J-04', 'alta', 1500.00, 2, 'Deshidratación severa, vómito y diarrea', 'Recuperación completa, vacunación al día'),
+(92, '2025-08-05 11:00:00', '2025-08-08 08:00:00', 'Insuficiencia renal aguda', 'J-02', 'alta', 1500.00, 15, 'Valores renales elevados, requiere fluidoterapia', 'Función renal normalizada'),
+(35, '2025-09-10 14:00:00', '2025-09-14 09:00:00', 'Neumonía bacteriana', 'J-03', 'alta', 800.00, 1, 'Dificultad respiratoria, fiebre persistente', 'Resolución de cuadro respiratorio'),
+(18, '2025-09-25 08:00:00', NULL, 'Crisis respiratoria síndrome braquicefálico', 'J-01', 'activa', 800.00, 3, 'Episodio agudo de disnea, requiere oxigenoterapia', NULL),
+(64, '2025-10-01 10:00:00', NULL, 'Monitoreo prequirúrgico cirugía mayor', 'J-02', 'activa', 800.00, 2, 'Preparación para cirugía programada mañana', NULL);
+
+-- Insertar 25 notas de hospitalización
+INSERT INTO notas_hospitalizacion (hospitalizacion_id, fecha_hora, temperatura, frecuencia_cardiaca, frecuencia_respiratoria, alimento_consumido, medicamentos_administrados, comportamiento, observaciones, empleado_registro) VALUES
+(1, '2025-02-08 20:00:00', 38.6, 88, 24, 'No comió', 'Tramadol 50mg, Carprofeno 75mg', 'Decaído, con dolor', 'Paciente postoperatorio reciente', 12),
+(1, '2025-02-09 08:00:00', 38.4, 85, 23, '50% ración', 'Tramadol 50mg, Carprofeno 75mg', 'Mejor ánimo', 'Mejoría en movilidad', 4),
+(1, '2025-02-09 20:00:00', 38.3, 82, 22, '75% ración', 'Tramadol 50mg, Carprofeno 75mg', 'Activo, buen ánimo', 'Evolución favorable', 12),
+(1, '2025-02-10 08:00:00', 38.2, 80, 22, '100% ración', 'Carprofeno 75mg', 'Alerta, movilidad mejorada', 'Listo para alta mañana', 4),
+(2, '2025-03-18 18:00:00', 38.8, 105, 28, 'No comió', 'Enalapril, Furosemida IV', 'Letárgico, respiración laboriosa', 'Requiere monitoreo estrecho', 5),
+(2, '2025-03-19 06:00:00', 38.6, 98, 26, '25% ración', 'Enalapril, Furosemida IV', 'Menos disnea', 'Mejoría respiratoria notable', 12),
+(2, '2025-03-19 18:00:00', 38.5, 95, 24, '50% ración', 'Enalapril, Furosemida', 'Alerta, mejor respiración', 'Evolución favorable', 5),
+(2, '2025-03-20 06:00:00', 38.4, 92, 23, '75% ración', 'Enalapril, Furosemida', 'Buen ánimo', 'Estable, continuar tratamiento', 12),
+(3, '2025-03-28 20:00:00', 38.7, 86, 24, 'No comió', 'Tramadol, Gabapentina', 'Muy dolorido, no se mueve', 'Dolor severo', 4),
+(3, '2025-03-29 08:00:00', 38.5, 84, 23, '30% ración', 'Tramadol, Gabapentina, Carprofeno', 'Ligeramente mejor', 'Medicación ajustada', 12),
+(3, '2025-03-30 08:00:00', 38.4, 82, 22, '60% ración', 'Tramadol, Gabapentina, Carprofeno', 'Mejoría significativa', 'Puede incorporarse', 4),
+(3, '2025-03-31 08:00:00', 38.3, 80, 22, '100% ración', 'Tramadol, Carprofeno', 'Buen ánimo, movilidad aceptable', 'Preparar alta', 12),
+(4, '2025-05-10 16:00:00', 38.9, 96, 26, 'No comió', 'Antibiótico IV, Analg ésico', 'Apatía, área inflamada', 'Vigilar evolución', 12),
+(4, '2025-05-11 08:00:00', 38.6, 92, 24, '40% ración', 'Antibiótico IV, Analgésico', 'Mejor ánimo', 'Inflamación reducida', 4),
+(4, '2025-05-12 08:00:00', 38.4, 88, 23, '80% ración', 'Antibiótico IV, Analgésico', 'Activo', 'Evolución excelente', 12),
+(5, '2025-06-15 18:00:00', 38.6, 94, 25, 'No comió', 'Analgésico, Fluidoterapia', 'Dolorido, nervioso', 'Sin signos de hemorragia interna', 4),
+(5, '2025-06-16 08:00:00', 38.4, 90, 24, '50% ración', 'Analgésico, Fluidoterapia', 'Mejor, más tranquilo', 'Sin complicaciones', 12),
+(5, '2025-06-17 08:00:00', 38.3, 88, 23, '100% ración', 'Analgésico', 'Alerta, buen ánimo', 'Preparar alta', 4),
+(6, '2025-07-20 14:00:00', 39.2, 120, 32, 'No comió', 'Antibiótico IV, Antiemético, Fluidos', 'Muy decaído, deshidratado', 'Estado crítico', 5),
+(6, '2025-07-21 08:00:00', 38.8, 108, 28, 'No comió', 'Antibiótico IV, Antiemético, Fluidos', 'Débil pero estable', 'Sin vómito ni diarrea en 12 hrs', 12),
+(6, '2025-07-22 08:00:00', 38.5, 98, 25, '30% ración blanda', 'Antibiótico IV, Fluidos', 'Mejoría notable', 'Tolera alimento', 4),
+(6, '2025-07-23 08:00:00', 38.3, 92, 24, '75% ración', 'Antibiótico oral', 'Buen ánimo, activo', 'Alta programada mañana', 12),
+(7, '2025-08-05 16:00:00', 39.0, 102, 27, 'No comió', 'Fluidoterapia IV intensiva', 'Letárgico, poliuria', 'Creatinina elevada', 5),
+(7, '2025-08-06 08:00:00', 38.6, 96, 25, '40% ración renal', 'Fluidoterapia IV', 'Más alerta', 'Valores renales mejorando', 12),
+(7, '2025-08-07 08:00:00', 38.4, 92, 24, '80% ración renal', 'Fluidoterapia', 'Buen ánimo', 'Función renal normalizada, alta mañana', 4);
+
+-- Insertar 30 registros de gastos
+INSERT INTO gastos (fecha, categoria, concepto, monto, metodo_pago, proveedor_id, factura, empleado_autoriza, observaciones) VALUES
+('2025-01-05', 'Compras', 'Medicamentos varios', 15200.00, 'transferencia', 1, 'FACT-2025-001', 10, 'Compra mensual farmacia'),
+('2025-01-05', 'Compras', 'Alimentos premium', 24500.00, 'transferencia', 9, 'FACT-2025-002', 10, 'Stock alimento Royal Canin'),
+('2025-01-10', 'Servicios', 'Electricidad enero', 3200.00, 'tarjeta', NULL, 'CFE-ENE-2025', 10, 'Recibo CFE'),
+('2025-01-10', 'Servicios', 'Agua enero', 850.00, 'efectivo', NULL, 'JUMAPAM-ENE-2025', 10, 'Recibo agua'),
+('2025-01-15', 'Nomina', 'Quincena 01-2025', 85000.00, 'transferencia', NULL, NULL, 10, 'Pago nómina quincena 1'),
+('2025-01-20', 'Mantenimiento', 'Reparación aire acondicionado', 4500.00, 'efectivo', NULL, 'FACT-MNT-001', 10, 'Mantenimiento equipo'),
+('2025-01-25', 'Publicidad', 'Anuncios redes sociales enero', 2800.00, 'tarjeta', NULL, 'META-ENE-2025', 10, 'Facebook e Instagram ads'),
+('2025-01-31', 'Nomina', 'Quincena 02-2025', 85000.00, 'transferencia', NULL, NULL, 10, 'Pago nómina quincena 2'),
+('2025-02-05', 'Compras', 'Instrumental quirúrgico', 8500.00, 'transferencia', 3, 'FACT-2025-003', 10, 'Suturas y bisturís'),
+('2025-02-10', 'Servicios', 'Electricidad febrero', 3450.00, 'tarjeta', NULL, 'CFE-FEB-2025', 10, 'Recibo CFE'),
+('2025-02-10', 'Servicios', 'Agua febrero', 920.00, 'efectivo', NULL, 'JUMAPAM-FEB-2025', 10, 'Recibo agua'),
+('2025-02-10', 'Renta', 'Renta local febrero', 18000.00, 'transferencia', NULL, NULL, 10, 'Pago mensual renta'),
+('2025-02-15', 'Nomina', 'Quincena 03-2025', 85000.00, 'transferencia', NULL, NULL, 10, 'Pago nómina quincena 3'),
+('2025-02-20', 'Compras', 'Productos higiene y limpieza', 3200.00, 'efectivo', 8, 'FACT-2025-004', 10, 'Shampoos y desinfectantes'),
+('2025-02-28', 'Nomina', 'Quincena 04-2025', 85000.00, 'transferencia', NULL, NULL, 10, 'Pago nómina quincena 4'),
+('2025-03-05', 'Compras', 'Alimentos y accesorios', 18900.00, 'transferencia', 15, 'FACT-2025-005', 10, 'Compra stock tienda'),
+('2025-03-10', 'Servicios', 'Internet y teléfono marzo', 1200.00, 'tarjeta', NULL, 'TEL-MAR-2025', 10, 'Servicios comunicación'),
+('2025-03-10', 'Servicios', 'Electricidad marzo', 3300.00, 'tarjeta', NULL, 'CFE-MAR-2025', 10, 'Recibo CFE'),
+('2025-03-15', 'Nomina', 'Quincena 05-2025', 85000.00, 'transferencia', NULL, NULL, 10, 'Pago nómina quincena 5'),
+('2025-03-20', 'Mantenimiento', 'Servicio equipos de rayos X', 5500.00, 'cheque', 18, 'FACT-MNT-002', 10, 'Mantenimiento preventivo'),
+('2025-03-25', 'Publicidad', 'Volantes y tarjetas presentación', 1800.00, 'efectivo', NULL, 'FACT-IMP-001', 10, 'Material publicitario'),
+('2025-03-31', 'Nomina', 'Quincena 06-2025', 85000.00, 'transferencia', NULL, NULL, 10, 'Pago nómina quincena 6'),
+('2025-04-05', 'Compras', 'Medicamentos y consumibles', 12400.00, 'transferencia', 11, 'FACT-2025-006', 10, 'Compra mensual MSD'),
+('2025-04-10', 'Servicios', 'Electricidad abril', 3280.00, 'tarjeta', NULL, 'CFE-ABR-2025', 10, 'Recibo CFE'),
+('2025-04-10', 'Renta', 'Renta local abril', 18000.00, 'transferencia', NULL, NULL, 10, 'Pago mensual renta'),
+('2025-04-15', 'Nomina', 'Quincena 07-2025', 85000.00, 'transferencia', NULL, NULL, 10, 'Pago nómina quincena 7'),
+('2025-04-20', 'Impuestos', 'IVA 1er trimestre 2025', 42500.00, 'transferencia', NULL, 'IVA-Q1-2025', 10, 'Pago impuestos SAT'),
+('2025-04-25', 'Compras', 'Equipamiento y accesorios', 7800.00, 'tarjeta', 4, 'FACT-2025-007', 10, 'Transportadoras y juguetes'),
+('2025-04-30', 'Nomina', 'Quincena 08-2025', 85000.00, 'transferencia', NULL, NULL, 10, 'Pago nómina quincena 8'),
+('2025-05-05', 'Compras', 'Alimentos terapéuticos', 16200.00, 'transferencia', 12, 'FACT-2025-008', 10, 'Hills prescription diet');
+
+-- ============================================================
+-- FIN DE INSERCION DE DATOS
+-- ============================================================
+
+-- ============================================================
+-- CONSULTAS UTILES PARA VISUALIZAR LA BASE DE DATOS
+-- ============================================================
+
+-- Consulta 1: Ver todos los dueños con sus mascotas
+-- Muestra la relación entre propietarios y sus animales
+SELECT 
+    d.id AS dueno_id,
+    CONCAT(d.nombre, ' ', d.apellido) AS dueno,
+    d.telefono,
+    d.tipo_cliente,
+    m.nombre AS mascota,
+    m.especie,
+    m.raza,
+    m.edad,
+    m.sexo
+FROM veterinaria_norte.duenos d
+LEFT JOIN veterinaria_norte.mascotas m ON d.id = m.dueno_id
+WHERE d.activo = TRUE
+ORDER BY d.apellido, m.nombre;
+
+-- Consulta 2: Historial médico completo de una mascota
+-- Permite ver todo el expediente clínico de un paciente
+SELECT 
+    m.nombre AS mascota,
+    CONCAT(d.nombre, ' ', d.apellido) AS dueno,
+    h.fecha,
+    h.tipo_registro,
+    h.peso_registro,
+    h.tratamiento,
+    h.medicamentos,
+    h.diagnostico,
+    h.observaciones
+FROM veterinaria_norte.mascotas m
+JOIN veterinaria_norte.duenos d ON m.dueno_id = d.id
+LEFT JOIN veterinaria_sur.historial_medico h ON m.id = h.mascota_id
+WHERE m.id = 1  -- Cambiar por el ID de la mascota deseada
+ORDER BY h.fecha DESC;
+
+-- Consulta 3: Citas pendientes y programadas
+-- Lista todas las citas futuras o pendientes de atención
+SELECT 
+    c.folio,
+    c.fecha_hora,
+    m.nombre AS mascota,
+    CONCAT(d.nombre, ' ', d.apellido) AS dueno,
+    d.telefono,
+    s.nombre AS servicio,
+    CONCAT(e.nombre, ' ', e.apellido) AS veterinario,
+    c.estado,
+    c.monto_total
+FROM veterinaria_sur.citas c
+JOIN veterinaria_norte.mascotas m ON c.mascota_id = m.id
+JOIN veterinaria_norte.duenos d ON c.dueno_id = d.id
+JOIN veterinaria_sur.servicios s ON c.servicio_id = s.id
+JOIN veterinaria_norte.empleados e ON c.empleado_id = e.id
+WHERE c.estado = 'pendiente'
+ORDER BY c.fecha_hora;
+
+-- Consulta 4: Inventario con stock bajo
+-- Identifica productos que requieren reorden
+SELECT 
+    i.codigo,
+    i.nombre,
+    i.categoria,
+    i.stock_actual,
+    i.stock_minimo,
+    (i.stock_minimo - i.stock_actual) AS faltante,
+    p.nombre_empresa AS proveedor,
+    p.contacto_telefono
+FROM veterinaria_sur.inventario i
+LEFT JOIN veterinaria_norte.proveedores p ON i.proveedor_id = p.id
+WHERE i.stock_actual <= i.stock_minimo
+AND i.activo = TRUE
+ORDER BY (i.stock_minimo - i.stock_actual) DESC;
+
+-- Consulta 5: Reporte de ventas mensual
+-- Muestra resumen de ingresos por ventas
+SELECT 
+    DATE_FORMAT(fecha_venta, '%Y-%m') AS mes,
+    COUNT(*) AS total_ventas,
+    SUM(subtotal) AS subtotal_mes,
+    SUM(descuento) AS descuentos_mes,
+    SUM(iva) AS iva_mes,
+    SUM(total) AS total_mes,
+    AVG(total) AS ticket_promedio
+FROM veterinaria_sur.ventas
+WHERE estado = 'pagada'
+GROUP BY DATE_FORMAT(fecha_venta, '%Y-%m')
+ORDER BY mes DESC;
+
+-- Consulta 6: Productos más vendidos
+-- Identifica los artículos con mayor rotación
+SELECT 
+    i.nombre AS producto,
+    i.categoria,
+    SUM(dv.cantidad) AS unidades_vendidas,
+    SUM(dv.subtotal) AS ingresos_totales,
+    COUNT(DISTINCT dv.venta_id) AS numero_ventas
+FROM veterinaria_sur.detalle_ventas dv
+JOIN veterinaria_sur.inventario i ON dv.producto_id = i.id
+GROUP BY i.id, i.nombre, i.categoria
+ORDER BY unidades_vendidas DESC
+LIMIT 20;
+
+-- Consulta 7: Próximas vacunas por aplicar
+-- Lista mascotas que requieren refuerzo de vacunación
+SELECT 
+    m.nombre AS mascota,
+    CONCAT(d.nombre, ' ', d.apellido) AS dueno,
+    d.telefono,
+    v.nombre_vacuna,
+    v.proxima_dosis
+FROM veterinaria_sur.vacunas v
+JOIN veterinaria_norte.mascotas m ON v.mascota_id = m.id
+JOIN veterinaria_norte.duenos d ON m.dueno_id = d.id
+WHERE v.proxima_dosis IS NOT NULL
+AND v.proxima_dosis BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 30 DAY)
+ORDER BY v.proxima_dosis;
+
+-- Consulta 8: Mascotas hospitalizadas actualmente
+-- Muestra pacientes en internamiento
+SELECT 
+    m.nombre AS mascota,
+    m.especie,
+    CONCAT(d.nombre, ' ', d.apellido) AS dueno,
+    d.telefono,
+    h.motivo,
+    h.jaula_numero,
+    h.fecha_ingreso,
+    DATEDIFF(NOW(), h.fecha_ingreso) AS dias_hospitalizacion,
+    CONCAT(e.nombre, ' ', e.apellido) AS veterinario_responsable
+FROM veterinaria_sur.hospitalizacion h
+JOIN veterinaria_norte.mascotas m ON h.mascota_id = m.id
+JOIN veterinaria_norte.duenos d ON m.dueno_id = d.id
+JOIN veterinaria_norte.empleados e ON h.empleado_responsable = e.id
+WHERE h.estado = 'activa'
+ORDER BY h.fecha_ingreso;
+
+-- Consulta 9: Reporte financiero consolidado mensual
+-- Vista completa de ingresos y egresos
+SELECT 
+    'Ingresos Consultas' AS concepto,
+    SUM(monto_total) AS monto,
+    DATE_FORMAT(fecha_hora, '%Y-%m') AS mes
+FROM veterinaria_sur.citas
+WHERE estado = 'completada'
+GROUP BY DATE_FORMAT(fecha_hora, '%Y-%m')
+
+UNION ALL
+
+SELECT 
+    'Ingresos Ventas' AS concepto,
+    SUM(total) AS monto,
+    DATE_FORMAT(fecha_venta, '%Y-%m') AS mes
+FROM veterinaria_sur.ventas
+WHERE estado = 'pagada'
+GROUP BY DATE_FORMAT(fecha_venta, '%Y-%m')
+
+UNION ALL
+
+SELECT 
+    CONCAT('Gasto: ', categoria) AS concepto,
+    -SUM(monto) AS monto,
+    DATE_FORMAT(fecha, '%Y-%m') AS mes
+FROM veterinaria_sur.gastos
+GROUP BY categoria, DATE_FORMAT(fecha, '%Y-%m')
+
+ORDER BY mes DESC, monto DESC;
+
+-- Consulta 10: Clientes VIP y Premium con mayor gasto
+-- Identifica los mejores clientes
+SELECT 
+    CONCAT(d.nombre, ' ', d.apellido) AS cliente,
+    d.tipo_cliente,
+    d.telefono,
+    d.email,
+    COUNT(DISTINCT m.id) AS total_mascotas,
+    COUNT(DISTINCT c.id) AS total_citas,
+    COALESCE(SUM(c.monto_total), 0) AS gasto_consultas,
+    COALESCE(SUM(v.total), 0) AS gasto_ventas,
+    COALESCE(SUM(c.monto_total), 0) + COALESCE(SUM(v.total), 0) AS gasto_total
+FROM veterinaria_norte.duenos d
+LEFT JOIN veterinaria_norte.mascotas m ON d.id = m.dueno_id
+LEFT JOIN veterinaria_sur.citas c ON d.id = c.dueno_id AND c.estado = 'completada'
+LEFT JOIN veterinaria_sur.ventas v ON d.id = v.dueno_id AND v.estado = 'pagada'
+WHERE d.tipo_cliente IN ('premium', 'vip')
+AND d.activo = TRUE
+GROUP BY d.id, d.nombre, d.apellido, d.tipo_cliente, d.telefono, d.email
+ORDER BY gasto_total DESC
+LIMIT 20;
+
+-- ============================================================
+-- CONSULTAS AVANZADAS PARA ANÁLISIS DISTRIBUIDO
+-- ============================================================
+
+-- Consulta 11: Vista federada - Información completa del paciente
+-- Combina datos de ambas bases de datos distribuidas
+SELECT 
+    -- Información del Norte (Clientes y Mascotas)
+    m.id AS mascota_id,
+    m.nombre AS mascota,
+    m.especie,
+    m.raza,
+    m.edad,
+    m.microchip,
+    CONCAT(d.nombre, ' ', d.apellido) AS propietario,
+    d.telefono,
+    d.ciudad,
+    d.tipo_cliente,
+    
+    -- Información del Sur (Servicios Médicos)
+    COUNT(DISTINCT c.id) AS total_consultas,
+    COUNT(DISTINCT v.id) AS total_vacunas,
+    COUNT(DISTINCT h.id) AS registros_historial,
+    MAX(c.fecha_hora) AS ultima_consulta,
+    MAX(v.fecha_aplicacion) AS ultima_vacuna
+    
+FROM veterinaria_norte.mascotas m
+JOIN veterinaria_norte.duenos d ON m.dueno_id = d.id
+LEFT JOIN veterinaria_sur.citas c ON m.id = c.mascota_id
+LEFT JOIN veterinaria_sur.vacunas v ON m.id = v.mascota_id
+LEFT JOIN veterinaria_sur.historial_medico h ON m.id = h.mascota_id
+WHERE m.activo = TRUE
+GROUP BY m.id, m.nombre, m.especie, m.raza, m.edad, m.microchip,
+         d.nombre, d.apellido, d.telefono, d.ciudad, d.tipo_cliente
+ORDER BY total_consultas DESC;
+
+-- ============================================================
+-- FIN DEL SCRIPT
+-- BASE DE DATOS COMPLEJA LISTA PARA USAR
+-- ============================================================

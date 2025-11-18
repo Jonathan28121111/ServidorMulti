@@ -304,11 +304,15 @@ public class UnCliente implements Runnable {
                                 continue;
                             }
                         } else if (!autenticado && cliente.autenticado) {
+                            // Invitado → Usuario autenticado: solo si el usuario está en "Todos"
                             if (!cliente.grupoActual.equals("Todos")) {
                                 continue;
                             }
                         } else if (autenticado && !cliente.autenticado) {
-                            continue;
+                            // Usuario autenticado → Invitado: solo si el usuario está en "Todos"
+                            if (!grupoActual.equals("Todos")) {
+                                continue;
+                            }
                         }
                         
                         cliente.enviarMensaje(prefijo + ": " + mensaje);
@@ -510,11 +514,15 @@ public class UnCliente implements Runnable {
                         continue;
                     }
                 } else if (!autenticado && cliente.autenticado) {
+                    // Invitado → Usuario autenticado: solo si el usuario está en "Todos"
                     if (!cliente.grupoActual.equals("Todos")) {
                         continue;
                     }
                 } else if (autenticado && !cliente.autenticado) {
-                    continue;
+                    // Usuario autenticado → Invitado: solo si el usuario está en "Todos"
+                    if (!grupoActual.equals("Todos")) {
+                        continue;
+                    }
                 }
                 
                 cliente.enviarMensaje(prefijo + ": " + mensaje);
