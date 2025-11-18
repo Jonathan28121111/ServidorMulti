@@ -320,7 +320,11 @@ public class UnCliente implements Runnable {
                 }
             }
         } catch (IOException ex) {
-            System.out.println("Cliente #" + miId + " desconectado");
+            if (!socket.isClosed()) {
+                System.out.println("Cliente #" + miId + " perdió la conexión de red");
+            } else {
+                System.out.println("Cliente #" + miId + " cerró la conexión");
+            }
         } finally {
             manejarDesconexion();
         }

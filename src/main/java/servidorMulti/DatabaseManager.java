@@ -98,7 +98,7 @@ public class DatabaseManager {
                 mensaje TEXT NOT NULL,
                 fecha_envio TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (grupo_id) REFERENCES grupos(id),
-                FOREIGN KEY (remitente) REFERENCIAS usuarios(username)
+                FOREIGN KEY (remitente) REFERENCES usuarios(username)
             )
         """;
         

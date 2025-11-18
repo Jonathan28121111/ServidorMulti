@@ -1,8 +1,10 @@
 package clientemulti;
 
 import java.io.DataInputStream;
+import java.io.EOFException;
 import java.io.IOException;
 import java.net.Socket;
+import java.net.SocketException;
 
 public class ParaRecibir implements Runnable {
     private final DataInputStream entrada;
@@ -48,9 +50,21 @@ public class ParaRecibir implements Runnable {
                     }
                 }
             }
-        } catch (IOException | InterruptedException e) {
+        } catch (EOFException e) {
+            System.err.println("\nConexion cerrada: El servidor termino la comunicacion");
+        } catch (SocketException e) {
             if (!socket.isClosed()) {
-                System.out.println("Conexion cerrada");
+                System.err.println("\nError: Se perdio la conexion con el servidor");
+            }
+        } catch (IOException e) {
+            if (!socket.isClosed()) {
+                System.err.println("\nError de comunicacion: " + traducirError(e.getMessage()));
+            }
+        } catch (InterruptedException e) {
+            System.err.println("\nError: Thread interrumpido");
+        } catch (Exception e) {
+            if (!socket.isClosed()) {
+                System.err.println("\nError inesperado: " + e.getMessage());
             }
         }
     }
@@ -88,5 +102,23 @@ public class ParaRecibir implements Runnable {
             ====================================
             """);
         System.out.print("Opcion: ");
+    }
+    
+    private String traducirError(String mensajeOriginal) {
+        if (mensajeOriginal == null) {
+            return "Error desconocido";
+        }
+        
+        if (mensajeOriginal.contains("Connection reset")) {
+            return "Conexion interrumpida por el servidor";
+        }
+        if (mensajeOriginal.contains("Connection timed out")) {
+            return "Tiempo de espera agotado";
+        }
+        if (mensajeOriginal.contains("Socket closed")) {
+            return "Socket cerrado";
+        }
+        
+        return mensajeOriginal;
     }
 }
