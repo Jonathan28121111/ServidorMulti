@@ -364,9 +364,6 @@ public class UnCliente implements Runnable {
         }
     }
     
-    // =====================================================
-    // NUEVO MÉTODO: Verificar si un usuario ya está conectado
-    // =====================================================
     private boolean usuarioYaConectado(String usuario) {
         for (UnCliente cliente : ServidorMulti.clientes.values()) {
             if (cliente.autenticado && 
@@ -666,7 +663,9 @@ public class UnCliente implements Runnable {
             return;
         }
         
-        if (!ServidorMulti.db.esMiembroDeGrupo(nombreGrupo, nombreUsuario)) {
+        // CORRECCIÓN: Permitir siempre cambiar al grupo "Todos" sin verificar membresía
+        if (!nombreGrupo.equalsIgnoreCase("Todos") && 
+            !ServidorMulti.db.esMiembroDeGrupo(nombreGrupo, nombreUsuario)) {
             enviarMensaje("ERROR: No eres miembro de este grupo\n");
             return;
         }
@@ -1261,12 +1260,8 @@ public class UnCliente implements Runnable {
         enviarMensaje("Contrasena: ");
     }
     
-    // =====================================================
-    // MÉTODO MODIFICADO: Verificar sesión única antes de login
-    // =====================================================
     private void procesarLoginPassword(String mensaje) throws IOException {
         if (ServidorMulti.db.autenticarUsuario(usuarioTemp, mensaje.trim())) {
-            // *** VERIFICAR SI EL USUARIO YA ESTÁ CONECTADO ***
             if (usuarioYaConectado(usuarioTemp)) {
                 enviarMensaje("\nERROR: Este usuario ya tiene una sesion activa\n\n1. Reintentar con otra cuenta\n2. Registrarse\n\nOpcion: ");
                 opcionMenu = "LOGIN_REINTENTAR";
