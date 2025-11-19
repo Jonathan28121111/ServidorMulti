@@ -41,7 +41,7 @@ public class ServidorMulti {
                 contador++;
             }
         } catch (IOException e) {
-            System.err.println("Error: " + e.getMessage());
+            System.err.println("Ha ocurrido un error ");
         } finally {
             db.cerrar();
         }

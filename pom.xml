@@ -53,6 +53,7 @@
                 <configuration>
                     <mainClass>${exec.mainClass}</mainClass>
                     <cleanupDaemonThreads>false</cleanupDaemonThreads>
+                    <quiet>true</quiet>
                     <arguments>
                         <argument>--add-opens</argument>
                         <argument>java.base/java.lang=ALL-UNNAMED</argument>

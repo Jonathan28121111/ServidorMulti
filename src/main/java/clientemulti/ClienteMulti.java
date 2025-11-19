@@ -36,9 +36,9 @@ public class ClienteMulti {
         } catch (SocketException e) {
             System.err.println("\nError: Se perdio la conexion con el servidor");
         } catch (IOException e) {
-            System.err.println("\nError de comunicacion: " + traducirError(e.getMessage()));
+            System.err.println("\nError de comunicacion ");
         } catch (Exception e) {
-            System.err.println("\nError inesperado: " + traducirError(e.getMessage()));
+            System.err.println("\nError inesperado " );
             e.printStackTrace();
         } finally {
             scanner.close();
