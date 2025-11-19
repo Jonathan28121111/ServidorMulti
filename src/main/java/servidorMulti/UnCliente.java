@@ -304,12 +304,10 @@ public class UnCliente implements Runnable {
                                 continue;
                             }
                         } else if (!autenticado && cliente.autenticado) {
-                            // Invitado → Usuario autenticado: solo si el usuario está en "Todos"
                             if (!cliente.grupoActual.equals("Todos")) {
                                 continue;
                             }
                         } else if (autenticado && !cliente.autenticado) {
-                            // Usuario autenticado → Invitado: solo si el usuario está en "Todos"
                             if (!grupoActual.equals("Todos")) {
                                 continue;
                             }
@@ -321,9 +319,9 @@ public class UnCliente implements Runnable {
             }
         } catch (IOException ex) {
             if (!socket.isClosed()) {
-                System.out.println("Cliente #" + miId + " perdió la conexión de red");
+                System.out.println("Cliente #" + miId + " perdio la conexion de red");
             } else {
-                System.out.println("Cliente #" + miId + " cerró la conexión");
+                System.out.println("Cliente #" + miId + " cerro la conexion");
             }
         } finally {
             manejarDesconexion();
@@ -364,6 +362,21 @@ public class UnCliente implements Runnable {
                 break;
             }
         }
+    }
+    
+    // =====================================================
+    // NUEVO MÉTODO: Verificar si un usuario ya está conectado
+    // =====================================================
+    private boolean usuarioYaConectado(String usuario) {
+        for (UnCliente cliente : ServidorMulti.clientes.values()) {
+            if (cliente.autenticado && 
+                cliente.nombreUsuario != null && 
+                cliente.nombreUsuario.equals(usuario) &&
+                cliente.miId != this.miId) {
+                return true;
+            }
+        }
+        return false;
     }
     
     private void procesarMenuAcciones(String mensaje) throws IOException {
@@ -518,12 +531,10 @@ public class UnCliente implements Runnable {
                         continue;
                     }
                 } else if (!autenticado && cliente.autenticado) {
-                    // Invitado → Usuario autenticado: solo si el usuario está en "Todos"
                     if (!cliente.grupoActual.equals("Todos")) {
                         continue;
                     }
                 } else if (autenticado && !cliente.autenticado) {
-                    // Usuario autenticado → Invitado: solo si el usuario está en "Todos"
                     if (!grupoActual.equals("Todos")) {
                         continue;
                     }
@@ -1250,8 +1261,20 @@ public class UnCliente implements Runnable {
         enviarMensaje("Contrasena: ");
     }
     
+    // =====================================================
+    // MÉTODO MODIFICADO: Verificar sesión única antes de login
+    // =====================================================
     private void procesarLoginPassword(String mensaje) throws IOException {
         if (ServidorMulti.db.autenticarUsuario(usuarioTemp, mensaje.trim())) {
+            // *** VERIFICAR SI EL USUARIO YA ESTÁ CONECTADO ***
+            if (usuarioYaConectado(usuarioTemp)) {
+                enviarMensaje("\nERROR: Este usuario ya tiene una sesion activa\n\n1. Reintentar con otra cuenta\n2. Registrarse\n\nOpcion: ");
+                opcionMenu = "LOGIN_REINTENTAR";
+                usuarioTemp = "";
+                System.out.println("Intento de login duplicado bloqueado: " + usuarioTemp);
+                return;
+            }
+            
             autenticado = true;
             nombreUsuario = usuarioTemp;
             mensajesEnviados = 0;
